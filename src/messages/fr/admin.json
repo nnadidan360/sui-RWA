@@ -1,0 +1,143 @@
+{
+  "navigation": {
+    "overview": "Aperçu",
+    "riskManagement": "Gestion des Risques",
+    "assetApproval": "Approbation d'Actifs",
+    "activityMonitor": "Surveillance d'Activité",
+    "platformMetrics": "Métriques de Plateforme",
+    "systemSettings": "Paramètres Système",
+    "signOut": "Se Déconnecter"
+  },
+  "dashboard": {
+    "title": "Tableau de Bord Admin",
+    "subtitle": "Administration de plateforme et gestion des risques",
+    "welcome": "Bienvenue, {email}",
+    "role": "Rôle : {roles}",
+    "sessionId": "ID de Session : {sessionId}",
+    "systemOperational": "Système Opérationnel"
+  },
+  "overview": {
+    "totalUsers": "Utilisateurs Totaux",
+    "tokenizedAssets": "Actifs Tokenisés",
+    "platformRiskScore": "Score de Risque de Plateforme",
+    "securityAlerts": "Alertes de Sécurité",
+    "recentAlerts": "Alertes Récentes",
+    "pendingApprovals": "Approbations en Attente",
+    "systemHealth": "Santé du Système",
+    "overallHealth": "Santé Générale",
+    "securityScore": "Score de Sécurité",
+    "avgResponseTime": "Temps de Réponse Moyen",
+    "offlineMode": "Mode hors ligne"
+  },
+  "alerts": {
+    "suspiciousLogin": "Tentative de connexion suspecte détectée",
+    "loanHealthFactor": "Facteur de santé du prêt en dessous du seuil",
+    "externalWalletLow": "Solde du portefeuille externe faible",
+    "view": "Voir"
+  },
+  "approvals": {
+    "realEstateToken": "Token Immobilier - Propriété NYC",
+    "artCollection": "Bundle NFT Collection d'Art",
+    "collateralRatio": "Augmenter le ratio de garantie à 150%",
+    "pendingReview": "en_attente_de_révision",
+    "pendingVerification": "en_attente_de_vérification",
+    "pendingApproval": "en_attente_d_approbation"
+  },
+  "session": {
+    "sessionActive": "Session Active",
+    "expires": "Expire : {time}",
+    "online": "En ligne",
+    "offline": "Hors ligne",
+    "sessionCreated": "Session créée : {time}",
+    "ipAddress": "IP : {ip}"
+  },
+  "permissions": {
+    "insufficientPermissions": "Certaines fonctionnalités d'administration ne sont pas disponibles en raison de permissions insuffisantes.",
+    "contactAdministrator": "Contactez votre administrateur si vous avez besoin d'accès à des fonctionnalités supplémentaires.",
+    "requiredPermissions": "Requis : {permissions}",
+    "currentPermissions": "Actuel : {permissions}",
+    "requiredRoles": "Requis : {roles}",
+    "currentRoles": "Actuel : {roles}"
+  },
+  "authentication": {
+    "title": "Connexion Admin",
+    "subtitle": "Connectez-vous pour accéder au panneau d'administration",
+    "email": "Adresse E-mail",
+    "password": "Mot de Passe",
+    "mfaToken": "Token MFA",
+    "mfaInstructions": "Entrez le code à 6 chiffres de votre application d'authentification",
+    "signIn": "Se Connecter",
+    "signingIn": "Connexion en cours...",
+    "loginFailed": "Échec de la Connexion",
+    "securityNotice": "Pour des raisons de sécurité, toutes les tentatives de connexion sont enregistrées et surveillées.",
+    "sessionExpired": "Session Expirée",
+    "sessionExpiredMessage": "Votre session d'administration a expiré pour des raisons de sécurité. Veuillez vous reconnecter pour continuer.",
+    "refreshSession": "Actualiser la Session",
+    "loginAgain": "Se Reconnecter",
+    "invalidSession": "Session Invalide",
+    "invalidSessionMessage": "Votre session est invalide ou a été compromise. Veuillez vous reconnecter.",
+    "goToLogin": "Aller à la Connexion"
+  },
+  "sessionValidator": {
+    "sessionExpiring": "Session Expire Bientôt",
+    "sessionExpiringMessage": "Votre session expirera dans {minutes} minute{plural}",
+    "extendSession": "Prolonger la Session",
+    "connectionLost": "Connexion Perdue",
+    "connectionLostMessage": "Vous êtes actuellement hors ligne. Certaines fonctionnalités peuvent ne pas fonctionner correctement.",
+    "sessionInvalid": "Votre session a expiré ou est invalide. Veuillez vous reconnecter."
+  },
+  "errors": {
+    "authenticationError": "Erreur d'Authentification",
+    "insufficientPermissions": "Permissions Insuffisantes",
+    "insufficientPermissionsMessage": "Vous n'avez pas les permissions requises pour accéder à cette page.",
+    "insufficientRolePrivileges": "Privilèges de Rôle Insuffisants",
+    "insufficientRolePrivilegesMessage": "Vous n'avez pas le rôle requis pour accéder à cette page.",
+    "goBack": "Retour",
+    "adminDashboard": "Tableau de Bord Admin"
+  },
+  "riskManagement": {
+    "title": "Gestion des Risques",
+    "collateralRatios": "Ratios de Garantie",
+    "liquidationThresholds": "Seuils de Liquidation",
+    "interestRates": "Taux d'Intérêt",
+    "riskParameters": "Paramètres de Risque"
+  },
+  "assetApproval": {
+    "title": "Approbation d'Actifs",
+    "pendingSubmissions": "Soumissions en Attente",
+    "approvedAssets": "Actifs Approuvés",
+    "rejectedAssets": "Actifs Rejetés",
+    "approve": "Approuver",
+    "reject": "Rejeter",
+    "review": "Réviser"
+  },
+  "activityMonitoring": {
+    "title": "Surveillance d'Activité",
+    "userActivity": "Activité Utilisateur",
+    "transactionMonitoring": "Surveillance des Transactions",
+    "securityEvents": "Événements de Sécurité",
+    "systemLogs": "Journaux Système"
+  },
+  "platformMetrics": {
+    "title": "Métriques de Plateforme",
+    "performanceMetrics": "Métriques de Performance",
+    "userEngagement": "Engagement Utilisateur",
+    "financialMetrics": "Métriques Financières",
+    "systemMetrics": "Métriques Système"
+  },
+  "systemSettings": {
+    "title": "Paramètres Système",
+    "generalSettings": "Paramètres Généraux",
+    "securitySettings": "Paramètres de Sécurité",
+    "integrationSettings": "Paramètres d'Intégration",
+    "maintenanceMode": "Mode Maintenance"
+  },
+  "formatting": {
+    "currency": "{amount} €",
+    "percentage": "{value} %",
+    "number": "{value}",
+    "date": "{date}",
+    "time": "{time}",
+    "datetime": "{date} {time}"
+  }
+}

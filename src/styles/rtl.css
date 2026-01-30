@@ -1,0 +1,107 @@
+/* RTL (Right-to-Left) Support for Arabic */
+
+[dir="rtl"] {
+  /* Text alignment */
+  text-align: right;
+}
+
+[dir="rtl"] .text-left {
+  text-align: right;
+}
+
+[dir="rtl"] .text-right {
+  text-align: left;
+}
+
+/* Flexbox direction */
+[dir="rtl"] .flex-row {
+  flex-direction: row-reverse;
+}
+
+[dir="rtl"] .space-x-2 > :not([hidden]) ~ :not([hidden]) {
+  --tw-space-x-reverse: 1;
+  margin-right: calc(0.5rem * var(--tw-space-x-reverse));
+  margin-left: calc(0.5rem * calc(1 - var(--tw-space-x-reverse)));
+}
+
+[dir="rtl"] .space-x-4 > :not([hidden]) ~ :not([hidden]) {
+  --tw-space-x-reverse: 1;
+  margin-right: calc(1rem * var(--tw-space-x-reverse));
+  margin-left: calc(1rem * calc(1 - var(--tw-space-x-reverse)));
+}
+
+/* Margins and padding */
+[dir="rtl"] .ml-auto {
+  margin-left: unset;
+  margin-right: auto;
+}
+
+[dir="rtl"] .mr-auto {
+  margin-right: unset;
+  margin-left: auto;
+}
+
+[dir="rtl"] .pl-4 {
+  padding-left: unset;
+  padding-right: 1rem;
+}
+
+[dir="rtl"] .pr-4 {
+  padding-right: unset;
+  padding-left: 1rem;
+}
+
+/* Borders */
+[dir="rtl"] .border-l {
+  border-left: unset;
+  border-right: 1px solid;
+}
+
+[dir="rtl"] .border-r {
+  border-right: unset;
+  border-left: 1px solid;
+}
+
+/* Positioning */
+[dir="rtl"] .left-0 {
+  left: unset;
+  right: 0;
+}
+
+[dir="rtl"] .right-0 {
+  right: unset;
+  left: 0;
+}
+
+/* Transform for icons and arrows */
+[dir="rtl"] .rtl-flip {
+  transform: scaleX(-1);
+}
+
+/* Form inputs */
+[dir="rtl"] input[type="text"],
+[dir="rtl"] input[type="email"],
+[dir="rtl"] input[type="password"],
+[dir="rtl"] textarea,
+[dir="rtl"] select {
+  text-align: right;
+}
+
+/* Navigation and menus */
+[dir="rtl"] .dropdown-menu {
+  left: unset;
+  right: 0;
+}
+
+/* Financial data alignment */
+[dir="rtl"] .financial-amount {
+  direction: ltr;
+  text-align: left;
+  display: inline-block;
+}
+
+/* Currency symbols */
+[dir="rtl"] .currency-symbol {
+  margin-left: 0.25rem;
+  margin-right: 0;
+}

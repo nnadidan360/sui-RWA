@@ -1,0 +1,143 @@
+{
+  "navigation": {
+    "overview": "Overview",
+    "riskManagement": "Risk Management",
+    "assetApproval": "Asset Approval",
+    "activityMonitor": "Activity Monitor",
+    "platformMetrics": "Platform Metrics",
+    "systemSettings": "System Settings",
+    "signOut": "Sign Out"
+  },
+  "dashboard": {
+    "title": "Admin Dashboard",
+    "subtitle": "Platform administration and risk management",
+    "welcome": "Welcome, {email}",
+    "role": "Role: {roles}",
+    "sessionId": "Session ID: {sessionId}",
+    "systemOperational": "System Operational"
+  },
+  "overview": {
+    "totalUsers": "Total Users",
+    "tokenizedAssets": "Tokenized Assets",
+    "platformRiskScore": "Platform Risk Score",
+    "securityAlerts": "Security Alerts",
+    "recentAlerts": "Recent Alerts",
+    "pendingApprovals": "Pending Approvals",
+    "systemHealth": "System Health",
+    "overallHealth": "Overall Health",
+    "securityScore": "Security Score",
+    "avgResponseTime": "Avg Response Time",
+    "offlineMode": "Offline mode"
+  },
+  "alerts": {
+    "suspiciousLogin": "Suspicious login attempt detected",
+    "loanHealthFactor": "Loan health factor below threshold",
+    "externalWalletLow": "External wallet balance low",
+    "view": "View"
+  },
+  "approvals": {
+    "realEstateToken": "Real Estate Token - NYC Property",
+    "artCollection": "Art Collection NFT Bundle",
+    "collateralRatio": "Increase collateral ratio to 150%",
+    "pendingReview": "pending_review",
+    "pendingVerification": "pending_verification",
+    "pendingApproval": "pending_approval"
+  },
+  "session": {
+    "sessionActive": "Session Active",
+    "expires": "Expires: {time}",
+    "online": "Online",
+    "offline": "Offline",
+    "sessionCreated": "Session created: {time}",
+    "ipAddress": "IP: {ip}"
+  },
+  "permissions": {
+    "insufficientPermissions": "Some admin features are not available due to insufficient permissions.",
+    "contactAdministrator": "Contact your administrator if you need access to additional features.",
+    "requiredPermissions": "Required: {permissions}",
+    "currentPermissions": "Current: {permissions}",
+    "requiredRoles": "Required: {roles}",
+    "currentRoles": "Current: {roles}"
+  },
+  "authentication": {
+    "title": "Admin Login",
+    "subtitle": "Sign in to access the administrative panel",
+    "email": "Email Address",
+    "password": "Password",
+    "mfaToken": "MFA Token",
+    "mfaInstructions": "Enter the 6-digit code from your authenticator app",
+    "signIn": "Sign In",
+    "signingIn": "Signing in...",
+    "loginFailed": "Login Failed",
+    "securityNotice": "For security purposes, all login attempts are logged and monitored.",
+    "sessionExpired": "Session Expired",
+    "sessionExpiredMessage": "Your admin session has expired for security reasons. Please log in again to continue.",
+    "refreshSession": "Refresh Session",
+    "loginAgain": "Login Again",
+    "invalidSession": "Invalid Session",
+    "invalidSessionMessage": "Your session is invalid or has been compromised. Please log in again.",
+    "goToLogin": "Go to Login"
+  },
+  "sessionValidator": {
+    "sessionExpiring": "Session Expiring Soon",
+    "sessionExpiringMessage": "Your session will expire in {minutes} minute{plural}",
+    "extendSession": "Extend Session",
+    "connectionLost": "Connection Lost",
+    "connectionLostMessage": "You're currently offline. Some features may not work properly.",
+    "sessionInvalid": "Your session has expired or is invalid. Please log in again."
+  },
+  "errors": {
+    "authenticationError": "Authentication Error",
+    "insufficientPermissions": "Insufficient Permissions",
+    "insufficientPermissionsMessage": "You don't have the required permissions to access this page.",
+    "insufficientRolePrivileges": "Insufficient Role Privileges",
+    "insufficientRolePrivilegesMessage": "You don't have the required role to access this page.",
+    "goBack": "Go Back",
+    "adminDashboard": "Admin Dashboard"
+  },
+  "riskManagement": {
+    "title": "Risk Management",
+    "collateralRatios": "Collateral Ratios",
+    "liquidationThresholds": "Liquidation Thresholds",
+    "interestRates": "Interest Rates",
+    "riskParameters": "Risk Parameters"
+  },
+  "assetApproval": {
+    "title": "Asset Approval",
+    "pendingSubmissions": "Pending Submissions",
+    "approvedAssets": "Approved Assets",
+    "rejectedAssets": "Rejected Assets",
+    "approve": "Approve",
+    "reject": "Reject",
+    "review": "Review"
+  },
+  "activityMonitoring": {
+    "title": "Activity Monitoring",
+    "userActivity": "User Activity",
+    "transactionMonitoring": "Transaction Monitoring",
+    "securityEvents": "Security Events",
+    "systemLogs": "System Logs"
+  },
+  "platformMetrics": {
+    "title": "Platform Metrics",
+    "performanceMetrics": "Performance Metrics",
+    "userEngagement": "User Engagement",
+    "financialMetrics": "Financial Metrics",
+    "systemMetrics": "System Metrics"
+  },
+  "systemSettings": {
+    "title": "System Settings",
+    "generalSettings": "General Settings",
+    "securitySettings": "Security Settings",
+    "integrationSettings": "Integration Settings",
+    "maintenanceMode": "Maintenance Mode"
+  },
+  "formatting": {
+    "currency": "${amount}",
+    "percentage": "{value}%",
+    "number": "{value}",
+    "date": "{date}",
+    "time": "{time}",
+    "datetime": "{date} {time}"
+  }
+}

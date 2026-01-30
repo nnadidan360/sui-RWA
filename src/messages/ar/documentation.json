@@ -1,0 +1,46 @@
+{
+  "guide": {
+    "start": "بدء الدليل",
+    "restart": "إعادة تشغيل الدليل",
+    "step": "الخطوة {{current}} من {{total}}",
+    "previous": "السابق",
+    "next": "التالي",
+    "finish": "إنهاء",
+    "skip": "تخطي الدليل"
+  },
+  "tooltip": {
+    "help": "عرض معلومات المساعدة"
+  },
+  "disclosure": {
+    "yourLevel": "مستواك",
+    "beginner": "مبتدئ",
+    "intermediate": "متوسط", 
+    "advanced": "متقدم",
+    "progress": "التقدم",
+    "complete": "مكتمل",
+    "prerequisites": "المتطلبات المسبقة",
+    "tips": "نصائح",
+    "warnings": "ملاحظات مهمة",
+    "markComplete": "تحديد كمكتمل"
+  },
+  "contextualHelp": {
+    "startGuide": "بدء الدليل",
+    "learnMore": "تعلم المزيد",
+    "dismiss": "إغلاق",
+    "dontShowAgain": "عدم الإظهار مرة أخرى"
+  },
+  "wizard": {
+    "step": "خطوة",
+    "of": "من",
+    "estimatedTime": "الوقت المقدر",
+    "tips": "نصائح",
+    "warnings": "ملاحظات مهمة",
+    "previous": "السابق",
+    "next": "التالي",
+    "skip": "تخطي",
+    "cancel": "إلغاء",
+    "complete": "إكمال",
+    "validating": "جاري التحقق...",
+    "validationError": "يرجى إكمال هذه الخطوة قبل المتابعة"
+  }
+}

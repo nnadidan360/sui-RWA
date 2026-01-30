@@ -1,0 +1,143 @@
+{
+  "navigation": {
+    "overview": "نظرة عامة",
+    "riskManagement": "إدارة المخاطر",
+    "assetApproval": "موافقة الأصول",
+    "activityMonitor": "مراقب النشاط",
+    "platformMetrics": "مقاييس المنصة",
+    "systemSettings": "إعدادات النظام",
+    "signOut": "تسجيل الخروج"
+  },
+  "dashboard": {
+    "title": "لوحة تحكم المدير",
+    "subtitle": "إدارة المنصة وإدارة المخاطر",
+    "welcome": "مرحباً، {email}",
+    "role": "الدور: {roles}",
+    "sessionId": "معرف الجلسة: {sessionId}",
+    "systemOperational": "النظام يعمل"
+  },
+  "overview": {
+    "totalUsers": "إجمالي المستخدمين",
+    "tokenizedAssets": "الأصول المرمزة",
+    "platformRiskScore": "نقاط مخاطر المنصة",
+    "securityAlerts": "تنبيهات الأمان",
+    "recentAlerts": "التنبيهات الأخيرة",
+    "pendingApprovals": "الموافقات المعلقة",
+    "systemHealth": "صحة النظام",
+    "overallHealth": "الصحة العامة",
+    "securityScore": "نقاط الأمان",
+    "avgResponseTime": "متوسط وقت الاستجابة",
+    "offlineMode": "وضع عدم الاتصال"
+  },
+  "alerts": {
+    "suspiciousLogin": "تم اكتشاف محاولة تسجيل دخول مشبوهة",
+    "loanHealthFactor": "عامل صحة القرض أقل من الحد الأدنى",
+    "externalWalletLow": "رصيد المحفظة الخارجية منخفض",
+    "view": "عرض"
+  },
+  "approvals": {
+    "realEstateToken": "رمز العقارات - عقار نيويورك",
+    "artCollection": "مجموعة NFT للمجموعة الفنية",
+    "collateralRatio": "زيادة نسبة الضمان إلى 150%",
+    "pendingReview": "في_انتظار_المراجعة",
+    "pendingVerification": "في_انتظار_التحقق",
+    "pendingApproval": "في_انتظار_الموافقة"
+  },
+  "session": {
+    "sessionActive": "الجلسة نشطة",
+    "expires": "تنتهي: {time}",
+    "online": "متصل",
+    "offline": "غير متصل",
+    "sessionCreated": "تم إنشاء الجلسة: {time}",
+    "ipAddress": "عنوان IP: {ip}"
+  },
+  "permissions": {
+    "insufficientPermissions": "بعض ميزات الإدارة غير متاحة بسبب عدم كفاية الصلاحيات.",
+    "contactAdministrator": "اتصل بالمدير إذا كنت بحاجة إلى الوصول إلى ميزات إضافية.",
+    "requiredPermissions": "مطلوب: {permissions}",
+    "currentPermissions": "الحالي: {permissions}",
+    "requiredRoles": "مطلوب: {roles}",
+    "currentRoles": "الحالي: {roles}"
+  },
+  "authentication": {
+    "title": "تسجيل دخول المدير",
+    "subtitle": "قم بتسجيل الدخول للوصول إلى لوحة الإدارة",
+    "email": "عنوان البريد الإلكتروني",
+    "password": "كلمة المرور",
+    "mfaToken": "رمز MFA",
+    "mfaInstructions": "أدخل الرمز المكون من 6 أرقام من تطبيق المصادقة الخاص بك",
+    "signIn": "تسجيل الدخول",
+    "signingIn": "جاري تسجيل الدخول...",
+    "loginFailed": "فشل تسجيل الدخول",
+    "securityNotice": "لأغراض الأمان، يتم تسجيل ومراقبة جميع محاولات تسجيل الدخول.",
+    "sessionExpired": "انتهت صلاحية الجلسة",
+    "sessionExpiredMessage": "انتهت صلاحية جلسة المدير لأسباب أمنية. يرجى تسجيل الدخول مرة أخرى للمتابعة.",
+    "refreshSession": "تحديث الجلسة",
+    "loginAgain": "تسجيل الدخول مرة أخرى",
+    "invalidSession": "جلسة غير صالحة",
+    "invalidSessionMessage": "جلستك غير صالحة أو تم اختراقها. يرجى تسجيل الدخول مرة أخرى.",
+    "goToLogin": "الذهاب إلى تسجيل الدخول"
+  },
+  "sessionValidator": {
+    "sessionExpiring": "الجلسة ستنتهي قريباً",
+    "sessionExpiringMessage": "ستنتهي جلستك خلال {minutes} دقيقة{plural}",
+    "extendSession": "تمديد الجلسة",
+    "connectionLost": "فقدان الاتصال",
+    "connectionLostMessage": "أنت حالياً غير متصل. قد لا تعمل بعض الميزات بشكل صحيح.",
+    "sessionInvalid": "انتهت صلاحية جلستك أو أنها غير صالحة. يرجى تسجيل الدخول مرة أخرى."
+  },
+  "errors": {
+    "authenticationError": "خطأ في المصادقة",
+    "insufficientPermissions": "صلاحيات غير كافية",
+    "insufficientPermissionsMessage": "ليس لديك الصلاحيات المطلوبة للوصول إلى هذه الصفحة.",
+    "insufficientRolePrivileges": "امتيازات دور غير كافية",
+    "insufficientRolePrivilegesMessage": "ليس لديك الدور المطلوب للوصول إلى هذه الصفحة.",
+    "goBack": "العودة",
+    "adminDashboard": "لوحة تحكم المدير"
+  },
+  "riskManagement": {
+    "title": "إدارة المخاطر",
+    "collateralRatios": "نسب الضمان",
+    "liquidationThresholds": "عتبات التصفية",
+    "interestRates": "أسعار الفائدة",
+    "riskParameters": "معاملات المخاطر"
+  },
+  "assetApproval": {
+    "title": "موافقة الأصول",
+    "pendingSubmissions": "المقدمات المعلقة",
+    "approvedAssets": "الأصول المعتمدة",
+    "rejectedAssets": "الأصول المرفوضة",
+    "approve": "موافقة",
+    "reject": "رفض",
+    "review": "مراجعة"
+  },
+  "activityMonitoring": {
+    "title": "مراقبة النشاط",
+    "userActivity": "نشاط المستخدم",
+    "transactionMonitoring": "مراقبة المعاملات",
+    "securityEvents": "أحداث الأمان",
+    "systemLogs": "سجلات النظام"
+  },
+  "platformMetrics": {
+    "title": "مقاييس المنصة",
+    "performanceMetrics": "مقاييس الأداء",
+    "userEngagement": "مشاركة المستخدم",
+    "financialMetrics": "المقاييس المالية",
+    "systemMetrics": "مقاييس النظام"
+  },
+  "systemSettings": {
+    "title": "إعدادات النظام",
+    "generalSettings": "الإعدادات العامة",
+    "securitySettings": "إعدادات الأمان",
+    "integrationSettings": "إعدادات التكامل",
+    "maintenanceMode": "وضع الصيانة"
+  },
+  "formatting": {
+    "currency": "{amount} $",
+    "percentage": "{value}%",
+    "number": "{value}",
+    "date": "{date}",
+    "time": "{time}",
+    "datetime": "{date} {time}"
+  }
+}

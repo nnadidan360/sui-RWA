@@ -1,0 +1,46 @@
+{
+  "guide": {
+    "start": "Start Guide",
+    "restart": "Restart Guide",
+    "step": "Step {{current}} of {{total}}",
+    "previous": "Previous",
+    "next": "Next",
+    "finish": "Finish",
+    "skip": "Skip Guide"
+  },
+  "tooltip": {
+    "help": "Show help information"
+  },
+  "disclosure": {
+    "yourLevel": "Your Level",
+    "beginner": "Beginner",
+    "intermediate": "Intermediate", 
+    "advanced": "Advanced",
+    "progress": "Progress",
+    "complete": "Complete",
+    "prerequisites": "Prerequisites",
+    "tips": "Tips",
+    "warnings": "Important Notes",
+    "markComplete": "Mark as Complete"
+  },
+  "contextualHelp": {
+    "startGuide": "Start Guide",
+    "learnMore": "Learn More",
+    "dismiss": "Dismiss",
+    "dontShowAgain": "Don't show again"
+  },
+  "wizard": {
+    "step": "Step",
+    "of": "of",
+    "estimatedTime": "Estimated time",
+    "tips": "Tips",
+    "warnings": "Important Notes",
+    "previous": "Previous",
+    "next": "Next",
+    "skip": "Skip",
+    "cancel": "Cancel",
+    "complete": "Complete",
+    "validating": "Validating...",
+    "validationError": "Please complete this step before continuing"
+  }
+}
