@@ -1,381 +1,453 @@
 /**
- * Session Management for Wallet Authentication
- * 
- * Handles user sessions, authentication tokens, and secure storage
+ * Credit OS Session Manager
+ * Manages session lifecycle and token validation
+ * Requirements: 1.3, 6.1
  */
 
-export interface UserSession {
-  publicKey: string;
-  accountHash: string;
-  walletName: string;
-  network: string;
-  connectedAt: number;
-  expiresAt: number;
-  signature?: string; // Optional signature for enhanced security
+import { EventEmitter } from 'events';
+import { getCreditOSConfig } from '../../config/credit-os';
+import { SessionInfo, CreditOSUser } from '../database/credit-os-models';
+
+// ============================================================================
+// TYPES AND INTERFACES
+// ============================================================================
+
+export interface SessionData {
+  sessionId: string;
+  userId: string;
+  deviceId: string;
+  ipAddress: string;
+  userAgent: string;
+  createdAt: Date;
+  expiresAt: Date;
+  lastActivity: Date;
+  permissions: string[];
+  active: boolean;
 }
 
-export interface AuthToken {
-  token: string;
-  expiresAt: number;
-  publicKey: string;
+export interface SessionValidationResult {
+  valid: boolean;
+  session?: SessionData;
+  user?: CreditOSUser;
+  reason?: string;
 }
 
-export class SessionManager {
-  private static readonly SESSION_KEY = 'rwa-lending-session';
-  private static readonly TOKEN_KEY = 'rwa-lending-auth-token';
-  private static readonly SESSION_DURATION = 24 * 60 * 60 * 1000; // 24 hours
-  private static readonly TOKEN_DURATION = 60 * 60 * 1000; // 1 hour
+export interface SessionMetrics {
+  totalSessions: number;
+  activeSessions: number;
+  expiredSessions: number;
+  averageSessionDuration: number;
+  sessionsPerUser: Map<string, number>;
+}
 
-  private currentSession: UserSession | null = null;
-  private authToken: AuthToken | null = null;
-  private eventListeners: Map<string, Function[]> = new Map();
+// ============================================================================
+// SESSION MANAGER CLASS
+// ============================================================================
+
+export class SessionManager extends EventEmitter {
+  private config = getCreditOSConfig();
+  private sessions = new Map<string, SessionData>();
+  private userSessions = new Map<string, Set<string>>(); // userId -> sessionIds
+  private cleanupInterval: NodeJS.Timeout;
 
   constructor() {
-    this.loadSession();
-    this.loadAuthToken();
-    this.startSessionMonitoring();
+    super();
+    
+    // Start cleanup interval for expired sessions
+    this.cleanupInterval = setInterval(() => {
+      this.cleanupExpiredSessions();
+    }, 60000); // Check every minute
   }
 
+  // ============================================================================
+  // SESSION LIFECYCLE
+  // ============================================================================
+
   /**
-   * Create a new session for the connected wallet
+   * Create a new session
+   * Requirements: 1.3
    */
-  async createSession(
-    publicKey: string,
-    accountHash: string,
-    walletName: string,
-    network: string,
-    signature?: string
-  ): Promise<UserSession> {
-    const now = Date.now();
-    const session: UserSession = {
-      publicKey,
-      accountHash,
-      walletName,
-      network,
-      connectedAt: now,
-      expiresAt: now + SessionManager.SESSION_DURATION,
-      signature,
+  createSession(
+    userId: string,
+    deviceId: string,
+    ipAddress: string,
+    userAgent: string,
+    permissions: string[] = ['basic']
+  ): SessionData {
+    const sessionId = this.generateSessionId();
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + this.config.auth.sessionDuration);
+
+    const session: SessionData = {
+      sessionId,
+      userId,
+      deviceId,
+      ipAddress: this.hashIP(ipAddress),
+      userAgent,
+      createdAt: now,
+      expiresAt,
+      lastActivity: now,
+      permissions,
+      active: true,
     };
 
-    this.currentSession = session;
-    this.saveSession();
-    
-    // Generate auth token
-    await this.generateAuthToken(publicKey);
-    
+    // Store session
+    this.sessions.set(sessionId, session);
+
+    // Track user sessions
+    if (!this.userSessions.has(userId)) {
+      this.userSessions.set(userId, new Set());
+    }
+    this.userSessions.get(userId)!.add(sessionId);
+
+    // Enforce session limits per user
+    this.enforceSessionLimits(userId);
+
+    // Emit session created event
     this.emit('sessionCreated', session);
+
     return session;
   }
 
   /**
-   * Get current active session
+   * Validate session and update activity
+   * Requirements: 1.3
    */
-  getCurrentSession(): UserSession | null {
-    if (!this.currentSession) return null;
-    
-    // Check if session is expired
-    if (Date.now() > this.currentSession.expiresAt) {
-      this.clearSession();
-      return null;
+  validateSession(
+    sessionId: string,
+    deviceId?: string,
+    ipAddress?: string
+  ): SessionValidationResult {
+    const session = this.sessions.get(sessionId);
+
+    if (!session) {
+      return {
+        valid: false,
+        reason: 'Session not found',
+      };
     }
-    
-    return this.currentSession;
+
+    if (!session.active) {
+      return {
+        valid: false,
+        reason: 'Session inactive',
+      };
+    }
+
+    const now = new Date();
+    if (now > session.expiresAt) {
+      this.revokeSession(sessionId, 'expired');
+      return {
+        valid: false,
+        reason: 'Session expired',
+      };
+    }
+
+    // Validate device consistency if provided
+    if (deviceId && session.deviceId !== deviceId) {
+      this.emit('deviceMismatch', {
+        sessionId,
+        expectedDevice: session.deviceId,
+        providedDevice: deviceId,
+      });
+      return {
+        valid: false,
+        reason: 'Device mismatch',
+      };
+    }
+
+    // Validate IP consistency if provided (allow some flexibility)
+    if (ipAddress) {
+      const hashedIP = this.hashIP(ipAddress);
+      if (session.ipAddress !== hashedIP) {
+        // Log IP change but don't invalidate session
+        this.emit('ipChanged', {
+          sessionId,
+          oldIP: session.ipAddress,
+          newIP: hashedIP,
+        });
+        session.ipAddress = hashedIP;
+      }
+    }
+
+    // Update last activity
+    session.lastActivity = now;
+
+    return {
+      valid: true,
+      session,
+    };
   }
 
   /**
-   * Extend current session
+   * Refresh session expiry
    */
-  extendSession(): boolean {
-    if (!this.currentSession) return false;
-    
-    const now = Date.now();
-    this.currentSession.expiresAt = now + SessionManager.SESSION_DURATION;
-    this.saveSession();
-    
-    this.emit('sessionExtended', this.currentSession);
+  refreshSession(sessionId: string): boolean {
+    const session = this.sessions.get(sessionId);
+    if (!session || !session.active) {
+      return false;
+    }
+
+    const now = new Date();
+    session.expiresAt = new Date(now.getTime() + this.config.auth.sessionDuration);
+    session.lastActivity = now;
+
+    this.emit('sessionRefreshed', session);
     return true;
   }
 
   /**
-   * Clear current session
+   * Revoke a specific session
    */
-  clearSession(): void {
-    const wasActive = !!this.currentSession;
-    
-    this.currentSession = null;
-    this.authToken = null;
-    
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem(SessionManager.SESSION_KEY);
-      localStorage.removeItem(SessionManager.TOKEN_KEY);
-    }
-    
-    if (wasActive) {
-      this.emit('sessionCleared');
-    }
-  }
-
-  /**
-   * Check if user is authenticated
-   */
-  isAuthenticated(): boolean {
-    const session = this.getCurrentSession();
-    const token = this.getValidAuthToken();
-    return !!(session && token);
-  }
-
-  /**
-   * Get current auth token if valid
-   */
-  getAuthToken(): string | null {
-    const token = this.getValidAuthToken();
-    return token ? token.token : null;
-  }
-
-  /**
-   * Generate a new authentication token
-   */
-  private async generateAuthToken(publicKey: string): Promise<AuthToken> {
-    const now = Date.now();
-    const tokenData = {
-      publicKey,
-      timestamp: now,
-      random: Math.random().toString(36).substring(2),
-    };
-    
-    // In a real implementation, this would be signed by the server
-    // For now, we'll create a simple token
-    const token = btoa(JSON.stringify(tokenData));
-    
-    const authToken: AuthToken = {
-      token,
-      expiresAt: now + SessionManager.TOKEN_DURATION,
-      publicKey,
-    };
-    
-    this.authToken = authToken;
-    this.saveAuthToken();
-    
-    return authToken;
-  }
-
-  /**
-   * Refresh auth token if needed
-   */
-  async refreshAuthToken(): Promise<boolean> {
-    if (!this.currentSession) return false;
-    
-    const token = this.getValidAuthToken();
-    if (token && token.expiresAt - Date.now() > 5 * 60 * 1000) {
-      // Token is still valid for more than 5 minutes
-      return true;
-    }
-    
-    try {
-      await this.generateAuthToken(this.currentSession.publicKey);
-      this.emit('tokenRefreshed', this.authToken);
-      return true;
-    } catch (error) {
-      console.error('Failed to refresh auth token:', error);
+  revokeSession(sessionId: string, reason: string = 'manual'): boolean {
+    const session = this.sessions.get(sessionId);
+    if (!session) {
       return false;
     }
+
+    session.active = false;
+
+    // Remove from user sessions tracking
+    const userSessionSet = this.userSessions.get(session.userId);
+    if (userSessionSet) {
+      userSessionSet.delete(sessionId);
+      if (userSessionSet.size === 0) {
+        this.userSessions.delete(session.userId);
+      }
+    }
+
+    // Remove from sessions map
+    this.sessions.delete(sessionId);
+
+    this.emit('sessionRevoked', { session, reason });
+    return true;
   }
 
   /**
-   * Validate session with signature (optional enhanced security)
+   * Revoke all sessions for a user
+   * Requirements: 6.4 (fraud response)
    */
-  async validateSessionSignature(message: string, signature: string): Promise<boolean> {
-    if (!this.currentSession) return false;
-    
-    try {
-      // In a real implementation, this would verify the signature
-      // against the public key using Casper SDK
-      // For now, we'll simulate validation
-      return signature.length > 0;
-    } catch (error) {
-      console.error('Signature validation failed:', error);
-      return false;
+  revokeAllUserSessions(userId: string, reason: string = 'security'): number {
+    const userSessionSet = this.userSessions.get(userId);
+    if (!userSessionSet) {
+      return 0;
+    }
+
+    const sessionIds = Array.from(userSessionSet);
+    let revokedCount = 0;
+
+    for (const sessionId of sessionIds) {
+      if (this.revokeSession(sessionId, reason)) {
+        revokedCount++;
+      }
+    }
+
+    this.emit('allUserSessionsRevoked', { userId, count: revokedCount, reason });
+    return revokedCount;
+  }
+
+  /**
+   * Get session by ID
+   */
+  getSession(sessionId: string): SessionData | undefined {
+    return this.sessions.get(sessionId);
+  }
+
+  /**
+   * Get all active sessions for a user
+   */
+  getUserSessions(userId: string): SessionData[] {
+    const userSessionSet = this.userSessions.get(userId);
+    if (!userSessionSet) {
+      return [];
+    }
+
+    const sessions: SessionData[] = [];
+    for (const sessionId of userSessionSet) {
+      const session = this.sessions.get(sessionId);
+      if (session && session.active) {
+        sessions.push(session);
+      }
+    }
+
+    return sessions;
+  }
+
+  // ============================================================================
+  // SESSION MANAGEMENT
+  // ============================================================================
+
+  /**
+   * Enforce session limits per user
+   */
+  private enforceSessionLimits(userId: string): void {
+    const userSessionSet = this.userSessions.get(userId);
+    if (!userSessionSet) {
+      return;
+    }
+
+    const maxSessions = this.config.auth.maxActiveSessions;
+    if (userSessionSet.size <= maxSessions) {
+      return;
+    }
+
+    // Get all sessions for user, sorted by last activity
+    const userSessions = Array.from(userSessionSet)
+      .map(sessionId => this.sessions.get(sessionId))
+      .filter((session): session is SessionData => session !== undefined)
+      .sort((a, b) => a.lastActivity.getTime() - b.lastActivity.getTime());
+
+    // Revoke oldest sessions
+    const sessionsToRevoke = userSessions.slice(0, userSessions.length - maxSessions);
+    for (const session of sessionsToRevoke) {
+      this.revokeSession(session.sessionId, 'limit_exceeded');
     }
   }
 
   /**
-   * Get session info for API requests
+   * Clean up expired sessions
    */
-  getSessionHeaders(): Record<string, string> {
-    const token = this.getAuthToken();
-    const session = this.getCurrentSession();
-    
-    if (!token || !session) return {};
-    
+  private cleanupExpiredSessions(): void {
+    const now = new Date();
+    const expiredSessions: string[] = [];
+
+    for (const [sessionId, session] of this.sessions) {
+      if (now > session.expiresAt) {
+        expiredSessions.push(sessionId);
+      }
+    }
+
+    for (const sessionId of expiredSessions) {
+      this.revokeSession(sessionId, 'expired');
+    }
+
+    if (expiredSessions.length > 0) {
+      this.emit('sessionsCleanedUp', { count: expiredSessions.length });
+    }
+  }
+
+  // ============================================================================
+  // SECURITY FEATURES
+  // ============================================================================
+
+  /**
+   * Check for suspicious session activity
+   * Requirements: 6.1
+   */
+  detectSuspiciousActivity(userId: string): {
+    suspicious: boolean;
+    reasons: string[];
+  } {
+    const userSessions = this.getUserSessions(userId);
+    const reasons: string[] = [];
+
+    // Check for too many concurrent sessions
+    if (userSessions.length > this.config.auth.maxActiveSessions * 0.8) {
+      reasons.push('High number of concurrent sessions');
+    }
+
+    // Check for sessions from different locations
+    const uniqueIPs = new Set(userSessions.map(s => s.ipAddress));
+    if (uniqueIPs.size > 3) {
+      reasons.push('Sessions from multiple locations');
+    }
+
+    // Check for rapid session creation
+    const recentSessions = userSessions.filter(
+      s => Date.now() - s.createdAt.getTime() < 300000 // 5 minutes
+    );
+    if (recentSessions.length > 3) {
+      reasons.push('Rapid session creation');
+    }
+
+    // Check for unusual user agents
+    const userAgents = userSessions.map(s => s.userAgent);
+    const uniqueUserAgents = new Set(userAgents);
+    if (uniqueUserAgents.size > userSessions.length * 0.5) {
+      reasons.push('Multiple different user agents');
+    }
+
     return {
-      'Authorization': `Bearer ${token}`,
-      'X-Wallet-Address': session.publicKey,
-      'X-Wallet-Network': session.network,
+      suspicious: reasons.length > 0,
+      reasons,
     };
   }
 
   /**
-   * Load session from storage
+   * Get session metrics for monitoring
    */
-  private loadSession(): void {
-    if (typeof window === 'undefined') return;
-    
-    try {
-      const sessionData = localStorage.getItem(SessionManager.SESSION_KEY);
-      if (sessionData) {
-        const session = JSON.parse(sessionData) as UserSession;
-        
-        // Check if session is still valid
-        if (Date.now() < session.expiresAt) {
-          this.currentSession = session;
-        } else {
-          localStorage.removeItem(SessionManager.SESSION_KEY);
-        }
+  getMetrics(): SessionMetrics {
+    const now = new Date();
+    let totalDuration = 0;
+    let activeSessions = 0;
+    let expiredSessions = 0;
+
+    for (const session of this.sessions.values()) {
+      if (session.active && now <= session.expiresAt) {
+        activeSessions++;
+        totalDuration += now.getTime() - session.createdAt.getTime();
+      } else {
+        expiredSessions++;
       }
-    } catch (error) {
-      console.error('Failed to load session:', error);
-      localStorage.removeItem(SessionManager.SESSION_KEY);
     }
+
+    const sessionsPerUser = new Map<string, number>();
+    for (const [userId, sessionSet] of this.userSessions) {
+      sessionsPerUser.set(userId, sessionSet.size);
+    }
+
+    return {
+      totalSessions: this.sessions.size,
+      activeSessions,
+      expiredSessions,
+      averageSessionDuration: activeSessions > 0 ? totalDuration / activeSessions : 0,
+      sessionsPerUser,
+    };
+  }
+
+  // ============================================================================
+  // UTILITY METHODS
+  // ============================================================================
+
+  private generateSessionId(): string {
+    return `sess_${Date.now()}_${Math.random().toString(36).substring(2)}`;
+  }
+
+  private hashIP(ipAddress: string): string {
+    // Use a simple hash for IP addresses to maintain privacy
+    const crypto = require('crypto');
+    return crypto.createHash('sha256').update(ipAddress).digest('hex');
   }
 
   /**
-   * Save session to storage
+   * Cleanup resources
    */
-  private saveSession(): void {
-    if (typeof window === 'undefined' || !this.currentSession) return;
-    
-    try {
-      localStorage.setItem(
-        SessionManager.SESSION_KEY,
-        JSON.stringify(this.currentSession)
-      );
-    } catch (error) {
-      console.error('Failed to save session:', error);
+  destroy(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
     }
-  }
-
-  /**
-   * Load auth token from storage
-   */
-  private loadAuthToken(): void {
-    if (typeof window === 'undefined') return;
-    
-    try {
-      const tokenData = localStorage.getItem(SessionManager.TOKEN_KEY);
-      if (tokenData) {
-        const token = JSON.parse(tokenData) as AuthToken;
-        
-        // Check if token is still valid
-        if (Date.now() < token.expiresAt) {
-          this.authToken = token;
-        } else {
-          localStorage.removeItem(SessionManager.TOKEN_KEY);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to load auth token:', error);
-      localStorage.removeItem(SessionManager.TOKEN_KEY);
-    }
-  }
-
-  /**
-   * Save auth token to storage
-   */
-  private saveAuthToken(): void {
-    if (typeof window === 'undefined' || !this.authToken) return;
-    
-    try {
-      localStorage.setItem(
-        SessionManager.TOKEN_KEY,
-        JSON.stringify(this.authToken)
-      );
-    } catch (error) {
-      console.error('Failed to save auth token:', error);
-    }
-  }
-
-  /**
-   * Get valid auth token
-   */
-  private getValidAuthToken(): AuthToken | null {
-    if (!this.authToken) return null;
-    
-    if (Date.now() > this.authToken.expiresAt) {
-      this.authToken = null;
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem(SessionManager.TOKEN_KEY);
-      }
-      return null;
-    }
-    
-    return this.authToken;
-  }
-
-  /**
-   * Start session monitoring
-   */
-  private startSessionMonitoring(): void {
-    if (typeof window === 'undefined') return;
-    
-    // Check session validity every minute
-    setInterval(() => {
-      const session = this.getCurrentSession();
-      if (!session && this.currentSession) {
-        // Session expired
-        this.clearSession();
-      }
-      
-      // Auto-refresh token if needed
-      if (session) {
-        this.refreshAuthToken();
-      }
-    }, 60 * 1000);
-    
-    // Listen for storage changes (multi-tab support)
-    window.addEventListener('storage', (event) => {
-      if (event.key === SessionManager.SESSION_KEY) {
-        if (event.newValue) {
-          try {
-            this.currentSession = JSON.parse(event.newValue);
-            this.emit('sessionChanged', this.currentSession);
-          } catch (error) {
-            console.error('Failed to parse session from storage:', error);
-          }
-        } else {
-          this.currentSession = null;
-          this.emit('sessionCleared');
-        }
-      }
-    });
-  }
-
-  /**
-   * Event handling
-   */
-  on(event: string, callback: Function) {
-    if (!this.eventListeners.has(event)) {
-      this.eventListeners.set(event, []);
-    }
-    this.eventListeners.get(event)!.push(callback);
-  }
-
-  off(event: string, callback: Function) {
-    const listeners = this.eventListeners.get(event);
-    if (listeners) {
-      const index = listeners.indexOf(callback);
-      if (index > -1) {
-        listeners.splice(index, 1);
-      }
-    }
-  }
-
-  private emit(event: string, data?: any) {
-    const listeners = this.eventListeners.get(event);
-    if (listeners) {
-      listeners.forEach(callback => callback(data));
-    }
+    this.sessions.clear();
+    this.userSessions.clear();
+    this.removeAllListeners();
   }
 }
 
-// Global session manager instance
-export const sessionManager = new SessionManager();
+// ============================================================================
+// SINGLETON INSTANCE
+// ============================================================================
+
+let sessionManagerInstance: SessionManager | null = null;
+
+export function getSessionManager(): SessionManager {
+  if (!sessionManagerInstance) {
+    sessionManagerInstance = new SessionManager();
+  }
+  return sessionManagerInstance;
+}
+
+export function destroySessionManager(): void {
+  if (sessionManagerInstance) {
+    sessionManagerInstance.destroy();
+    sessionManagerInstance = null;
+  }
+}
