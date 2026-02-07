@@ -1,0 +1,399 @@
+/**
+ * Property-Based Test: Casper Code Elimination
+ * **Feature: casper-cleanup, Property 2: Casper Code Elimination**
+ * 
+ * Tests that the system contains no references to CSPR, stCSPR, Casper services, 
+ * or Casper-specific functionality, operating exclusively on Sui blockchain.
+ * 
+ * Validates: Requirements 2.1, 2.2, 2.3, 2.4, 2.5
+ */
+
+import fc from 'fast-check';
+import fs from 'fs';
+import path from 'path';
+import { glob } from 'glob';
+
+describe('Property 2: Casper Code Elimination', () => {
+  // Get all source files to check
+  const getSourceFiles = async (): Promise<string[]> => {
+    const patterns = [
+      'src/**/*.{ts,tsx,js,jsx}',
+      'backend/src/**/*.{ts,tsx,js,jsx}',
+      'contracts/sources/**/*.move'
+    ];
+    
+    const files: string[] = [];
+    for (const pattern of patterns) {
+      const matchedFiles = await glob(pattern, { 
+        cwd: process.cwd(),
+        ignore: ['**/node_modules/**', '**/dist/**', '**/build/**', '**/*.test.*', '**/*.spec.*']
+      });
+      files.push(...matchedFiles);
+    }
+    
+    return files;
+  };
+
+  // Casper-related terms that should not exist
+  const casperTerms = [
+    'CSPR', 'cspr', 'stCSPR', 'stcspr',
+    'Casper', 'casper', 'CASPER',
+    'CasperWallet', 'casperWallet',
+    'ExternalWalletService',
+    'CasperStaking', 'casperStaking',
+    'CSPR_TOKEN', 'SCSPR_TOKEN'
+  ];
+
+  // Sui-equivalent terms that should be present instead
+  const suiTerms = [
+    'SUI', 'sui', 'stSUI', 'stsui',
+    'Sui', 'SUI_TOKEN', 'SSUI_TOKEN'
+  ];
+
+  it('Property 2.1: No source files should contain Casper-specific references', async () => {
+    const sourceFiles = await getSourceFiles();
+    
+    // Skip test if no source files found
+    if (sourceFiles.length === 0) {
+      console.warn('No source files found for Casper code elimination check');
+      return;
+    }
+    
+    await fc.assert(
+      fc.asyncProperty(
+        fc.integer({ min: 0, max: sourceFiles.length - 1 }),
+        async (fileIndex) => {
+          const filePath = sourceFiles[fileIndex];
+          
+          // Skip if file doesn't exist (might be generated)
+          if (!fs.existsSync(filePath)) {
+            return;
+          }
+          
+          const fileContent = fs.readFileSync(filePath, 'utf-8');
+          
+          // Check for Casper terms
+          for (const term of casperTerms) {
+            const regex = new RegExp(`\\b${term}\\b`, 'g');
+            const matches = fileContent.match(regex);
+            
+            // Assert: No Casper terms should be found
+            expect(matches).toBeNull();
+            
+            if (matches) {
+              throw new Error(
+                `Found Casper reference "${term}" in file ${filePath}. ` +
+                `Matches: ${matches.join(', ')}`
+              );
+            }
+          }
+        }
+      ),
+      { numRuns: Math.min(sourceFiles.length, 10), timeout: 5000 }
+    );
+  });
+
+  it('Property 2.2: Currency and token references should use SUI instead of CSPR', async () => {
+    const sourceFiles = await getSourceFiles();
+    const relevantFiles = sourceFiles.filter(f => f.includes('components') || f.includes('services'));
+    
+    if (relevantFiles.length === 0) {
+      console.warn('No component or service files found for currency check');
+      return;
+    }
+    
+    await fc.assert(
+      fc.asyncProperty(
+        fc.integer({ min: 0, max: relevantFiles.length - 1 }),
+        async (fileIndex) => {
+          const filePath = relevantFiles[fileIndex];
+          
+          if (!fs.existsSync(filePath)) {
+            return;
+          }
+          
+          const fileContent = fs.readFileSync(filePath, 'utf-8');
+          
+          // Check for currency-related patterns
+          const currencyPatterns = [
+            /currency.*['"](CSPR|cspr)['"]/g,
+            /asset.*['"](CSPR|cspr)['"]/g,
+            /symbol.*['"](CSPR|cspr)['"]/g,
+            /token.*['"](CSPR|cspr)['"]/g
+          ];
+          
+          for (const pattern of currencyPatterns) {
+            const matches = fileContent.match(pattern);
+            expect(matches).toBeNull();
+            
+            if (matches) {
+              throw new Error(
+                `Found CSPR currency reference in ${filePath}: ${matches.join(', ')}`
+              );
+            }
+          }
+          
+          // If file contains currency references, ensure they use SUI
+          if (fileContent.includes('currency') || fileContent.includes('asset') || fileContent.includes('symbol')) {
+            const hasSuiReference = suiTerms.some(term => fileContent.includes(term));
+            // This is informational - we want SUI references where appropriate
+            // but not all files need to have currency references
+          }
+        }
+      ),
+      { numRuns: Math.min(relevantFiles.length, 5), timeout: 5000 }
+    );
+  });
+
+  it('Property 2.3: Staking components should reference SUI validators, not Casper', async () => {
+    const stakingFiles = await glob('src/components/staking/**/*.{ts,tsx}', { 
+      cwd: process.cwd() 
+    });
+    
+    if (stakingFiles.length === 0) {
+      console.warn('No staking files found - skipping test');
+      return; // Skip if no staking files
+    }
+    
+    const fileIndexArbitrary = stakingFiles.length === 1 
+      ? fc.constant(0) 
+      : fc.integer({ min: 0, max: stakingFiles.length - 1 });
+    
+    await fc.assert(
+      fc.asyncProperty(
+        fileIndexArbitrary,
+        async (fileIndex) => {
+          const filePath = stakingFiles[fileIndex];
+          const fileContent = fs.readFileSync(filePath, 'utf-8');
+          
+          // Check for Casper staking references
+          const casperStakingTerms = [
+            'CasperStaking', 'casperStaking',
+            'CSPR.*staking', 'cspr.*staking',
+            'Casper.*validator', 'casper.*validator'
+          ];
+          
+          for (const term of casperStakingTerms) {
+            const regex = new RegExp(term, 'gi');
+            const matches = fileContent.match(regex);
+            expect(matches).toBeNull();
+          }
+          
+          // Ensure SUI staking references are used instead
+          if (fileContent.includes('staking') || fileContent.includes('validator')) {
+            const suiStakingTerms = ['SUI', 'sui', 'stSUI', 'Sui'];
+            const hasSuiReference = suiStakingTerms.some(term => 
+              fileContent.includes(term)
+            );
+            
+            // If it's a staking file, it should reference SUI
+            expect(hasSuiReference).toBe(true);
+          }
+        }
+      ),
+      { numRuns: Math.min(stakingFiles.length, 5), timeout: 5000 }
+    );
+  });
+
+  it('Property 2.4: Blockchain service files should only reference Sui endpoints', async () => {
+    const blockchainFiles = await glob('backend/src/services/blockchain/**/*.{ts,js}', { 
+      cwd: process.cwd() 
+    });
+    
+    if (blockchainFiles.length === 0) {
+      console.warn('No blockchain service files found - skipping test');
+      return; // Skip if no blockchain service files
+    }
+    
+    const fileIndexArbitrary = blockchainFiles.length === 1 
+      ? fc.constant(0) 
+      : fc.integer({ min: 0, max: blockchainFiles.length - 1 });
+    
+    await fc.assert(
+      fc.asyncProperty(
+        fileIndexArbitrary,
+        async (fileIndex) => {
+          const filePath = blockchainFiles[fileIndex];
+          const fileContent = fs.readFileSync(filePath, 'utf-8');
+          
+          // Check for Casper network references
+          const casperNetworkTerms = [
+            'casper-node', 'casper.network',
+            'testnet.casper', 'mainnet.casper',
+            'CasperServiceByJsonRPC'
+          ];
+          
+          for (const term of casperNetworkTerms) {
+            expect(fileContent).not.toContain(term);
+          }
+          
+          // If file contains network references, ensure they're Sui
+          if (fileContent.includes('network') || fileContent.includes('endpoint') || fileContent.includes('rpc')) {
+            const suiNetworkTerms = ['sui', 'devnet', 'testnet', 'mainnet'];
+            const hasSuiNetwork = suiNetworkTerms.some(term => 
+              fileContent.toLowerCase().includes(term)
+            );
+            
+            // Network files should reference Sui networks
+            expect(hasSuiNetwork).toBe(true);
+          }
+        }
+      ),
+      { numRuns: Math.min(blockchainFiles }t: 5000, 5), timeoungth.le
+    );
+  });
+
+  it('Property 2.5: Move contracts should only use Sui Move syntax and libraries', async () => {
+    const moveFiles = await glob('contracts/sources/**/*.move', { 
+      cwd: process.cwd() 
+    });
+    
+    if (moveFiles.length === 0) {
+      console.warn('No Move files found - skipping test');
+      return; // Skip if no Move files
+    }
+    
+    const fileIndexArbitrary = moveFiles.length === 1 
+      ? fc.constant(0) 
+      : fc.integer({ min: 0, max: moveFiles.length - 1 });
+    
+    await fc.assert(
+      fc.asyncProperty(
+        fileIndexArbitrary,
+        async (fileIndex) => {
+          const filePath = moveFiles[fileIndex];
+          const fileContent = fs.readFileSync(filePath, 'utf-8');
+          
+          // Check for Casper-specific Move syntax (if any existed)
+          const casperMoveTerms = [
+            'casper::', 'Casper::', 'CASPER::',
+            'cspr_token', 'CSPR_TOKEN'
+          ];
+          
+          for (const term of casperMoveTerms) {
+            expect(fileContent).not.toContain(term);
+          }
+          
+          // Ensure Sui Move syntax is used
+          const suiMovePatterns = [
+            /sui::/g,
+            /use sui::/g,
+            /module.*::/g
+          ];
+          
+          let hasSuiSyntax = false;
+          for (const pattern of suiMovePatterns) {
+            if (pattern.test(fileContent)) {
+              hasSuiSyntax = true;
+              break;
+            }
+          }
+          
+          // Move files should use Sui syntax
+          expect(hasSuiSyntax).toBe(true);
+        }
+      ),
+      { numRuns: moveFiles.length }
+    );
+  });
+
+  it('Property 2.6: Configuration files should not reference Casper networks or tokens', async () => {
+    const configFiles = await glob('{*.json,*.js,*.ts,src/config/**/*,backend/src/config/**/*}', { 
+      cwd: process.cwd(),
+      ignore: ['node_modules/**', 'dist/**', 'build/**']
+    });
+    
+    const existingConfigFiles = Array.isArray(configFiles) ? configFiles.filter(f => fs.existsSync(f)) : [];
+    
+    if (existingConfigFiles.length === 0) {
+      return; // Skip if no config files
+    }
+    
+    await fc.assert(
+      fc.asyncProperty(
+        fc.integer({ min: 0, max: existingConfigFiles.length - 1 }),
+        async (fileIndex) => {
+          const filePath = existingConfigFiles[fileIndex];
+          const fileContent = fs.readFileSync(filePath, 'utf-8');
+          
+          // Check for Casper configuration references
+          const casperConfigTerms = [
+            '"CSPR"', "'CSPR'", '"cspr"', "'cspr'",
+            'casper-node', 'casper.network',
+            'CASPER_NETWORK', 'CSPR_TOKEN_ADDRESS'
+          ];
+          
+          for (const term of casperConfigTerms) {
+            expect(fileContent).not.toContain(term);
+          }
+          
+          // If it's a blockchain config, should reference Sui
+          if (fileContent.includes('network') || fileContent.includes('blockchain') || fileContent.includes('rpc')) {
+            const suiConfigTerms = ['sui', 'SUI', 'devnet', 'testnet', 'mainnet'];
+            const hasSuiConfig = suiConfigTerms.some(term => 
+              fileContent.includes(term)
+            );
+            
+            // Blockchain configs should reference Sui
+            expect(hasSuiConfig).toBe(true);
+          }
+        }
+      ),
+      { numRuns: Math.min(existingConfigFiles.length, 50) }
+    );
+  });
+
+  it('Property 2.7: Test files should not mock Casper services or wallets', async () => {
+    const testFiles = await glob('{src,backend}/**/*.{test,spec}.{ts,tsx,js,jsx}', { 
+      cwd: process.cwd() 
+    });
+    
+    if (testFiles.length === 0) {
+      console.warn('No test files found - skipping test');
+      return; // Skip if no test files
+    }
+    
+    const fileIndexArbitrary = testFiles.length === 1 
+      ? fc.constant(0) 
+      : fc.integer({ min: 0, max: testFiles.length - 1 });
+    
+    await fc.assert(
+      fc.asyncProperty(
+        fileIndexArbitrary,
+        async (fileIndex) => {
+          const filePath = testFiles[fileIndex];
+          const fileContent = fs.readFileSync(filePath, 'utf-8');
+          
+          // Check for Casper test mocks
+          const casperTestTerms = [
+            'mockCasperWallet', 'MockCasperWallet',
+            'CasperWalletService', 'casperWalletService',
+            'mockCSPR', 'MockCSPR',
+            'ExternalWalletService'
+          ];
+          
+          for (const term of casperTestTerms) {
+            expect(fileContent).not.toContain(term);
+          }
+          
+          // If file contains wallet mocks, they should be for account abstraction
+          if (fileContent.includes('mock') && fileContent.includes('wallet')) {
+            const accountAbstractionTerms = [
+              'AuthService', 'SessionManager', 'UserAccountObject',
+              'internalUserId', 'authMethod'
+            ];
+            
+            // Should use account abstraction patterns instead
+            const hasAccountAbstraction = accountAbstractionTerms.some(term => 
+              fileContent.includes(term)
+            );
+            
+            // Wallet-related tests should use account abstraction
+            expect(hasAccountAbstraction).toBe(true);
+          }
+        }
+      ),
+      { numRuns: Math.min(testFiles.length, 100) }
+    );
+  });
+});

@@ -1,0 +1,329 @@
+/**
+ * Property-Based Test: Session Token Validation
+ * **Feature: casper-cleanup, Property 7: Session Token Validation**
+ * 
+ * Tests that authenticated requests validate time-bound session tokens, 
+ * device fingerprints, and capability permissions without wallet involvement.
+ * 
+ * Validates: Requirements 6.1, 6.4, 6.5
+ */
+
+import fc from 'fast-check';
+import { AuthService, SessionToken, DeviceFingerprint } from '../../src/services/auth/auth-service';
+import { SessionManager, CapabilityCheck } from '../../src/services/auth/session-manager';
+import { UserService } from '../../src/services/database/user-service';
+import { User } from '../../src/models/User';
+import { connectTestDB, disconnectTestDB } from '../helpers/test-db';
+
+describe('Property 7: Session Token Validation', () => {
+  let authService: AuthService;
+  let sessionManager: SessionManager;
+
+  beforeAll(async () => {
+    await connectTestDB();
+    authService = new AuthService();
+    sessionManager = new SessionManager(authService);
+  });
+
+  afterAll(async () => {
+    sessionManager.destroy();
+    await disconnectTestDB();
+  });
+
+  beforeEach(async () => {
+    await User.deleteMany({});
+  });
+
+  // Generator for device fingerprints
+  const deviceFingerprintArbitrary = fc.record({
+    deviceId: fc.uuid(),
+    browserFingerprint: fc.string({ minLength: 32, maxLength: 64 }),
+    ipAddress: fc.ipV4(),
+    userAgent: fc.string({ minLength: 50, maxLength: 200 }),
+    geolocation: fc.record({
+      country: fc.constantFrom('US', 'CA', 'GB', 'DE', 'FR'),
+      region: fc.string({ minLength: 2, maxLength: 20 }),
+      city: fc.string({ minLength: 3, maxLength: 30 })
+    }),
+    screenResolution: fc.constantFrom('1920x1080', '1366x768', '1440x900'),
+    timezone: fc.constantFrom('America/New_York', 'Europe/London', 'Asia/Tokyo')
+  });
+
+  // Generator for capabilities
+  const capabilitiesArbitrary = fc.array(
+    fc.constantFrom('borrow', 'lend', 'stake', 'withdraw', 'admin', 'read', 'write'),
+    { minLength: 0, maxLength: 5 }
+  );
+
+  // Generator for capability checks
+  const capabilityCheckArbitrary = fc.record({
+    action: fc.constantFrom('borrow', 'lend', 'stake', 'withdraw', 'read', 'write'),
+    resource: fc.option(fc.string({ minLength: 5, maxLength: 20 }), { nil: undefined }),
+    context: fc.option(fc.record({
+      resourceOwner: fc.option(fc.uuid(), { nil: undefined }),
+      timeRestricted: fc.boolean()
+    }), { nil: undefined })
+  });
+
+  it('Property 7.1: Valid session tokens should always validate successfully', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.emailAddress(),
+        deviceFingerprintArbitrary,
+        capabilitiesArbitrary,
+        async (email, deviceFingerprint, capabilities) => {
+          // Arrange: Create user and session
+          const user = await UserService.createUser({
+            authMethod: { type: 'email', identifier: email },
+            deviceFingerprint
+          });
+
+          const sessionToken = await sessionManager.createSession(
+            user._id.toString(),
+            user.internalUserId,
+            'email',
+            deviceFingerprint,
+            capabilities
+          );
+
+          // Act: Validate session
+          const validation = await sessionManager.validateSessionWithCapabilities(sessionToken);
+
+          // Assert: Valid session should always validate
+          expect(validation.isValid).toBe(true);
+          expect(validation.session).toBeDefined();
+          expect(validation.session!.sessionId).toBe(sessionToken.sessionId);
+          expect(validation.session!.internalUserId).toBe(user.internalUserId);
+          expect(validation.reason).toBeUndefined();
+          
+          // Verify no wallet involvement
+          expect(validation.session!.authMethod).toBe('email');
+          expect(validation.session!.deviceId).toBe(deviceFingerprint.deviceId);
+        }
+      ),
+      { numRuns: 40 }
+    );
+  });
+
+  it('Property 7.2: Expired session tokens should always fail validation', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.emailAddress(),
+        deviceFingerprintArbitrary,
+        fc.integer({ min: 1, max: 1000 }), // milliseconds in the past
+        async (email, deviceFingerprint, pastTime) => {
+          // Arrange: Create user and session
+          const user = await UserService.createUser({
+            authMethod: { type: 'email', identifier: email },
+            deviceFingerprint
+          });
+
+          const sessionToken = await sessionManager.createSession(
+            user._id.toString(),
+            user.internalUserId,
+            'email',
+            deviceFingerprint,
+            []
+          );
+
+          // Manually expire the session
+          sessionToken.expiresAt = new Date(Date.now() - pastTime);
+
+          // Act: Validate expired session
+          const validation = await sessionManager.validateSessionWithCapabilities(sessionToken);
+
+          // Assert: Expired session should always fail
+          expect(validation.isValid).toBe(false);
+          expect(validation.reason).toBeDefined();
+          expect(validation.reason).toContain('expired');
+        }
+      ),
+      { numRuns: 30 }
+    );
+  });
+
+  it('Property 7.3: Capability checks should enforce permissions correctly', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.emailAddress(),
+        deviceFingerprintArbitrary,
+        capabilitiesArbitrary,
+        capabilityCheckArbitrary,
+        async (email, deviceFingerprint, userCapabilities, capabilityCheck) => {
+          // Arrange: Create user and session with specific capabilities
+          const user = await UserService.createUser({
+            authMethod: { type: 'email', identifier: email },
+            deviceFingerprint
+          });
+
+          const sessionToken = await sessionManager.createSession(
+            user._id.toString(),
+            user.internalUserId,
+            'email',
+            deviceFingerprint,
+            userCapabilities
+          );
+
+          // Act: Validate session with capability check
+          const validation = await sessionManager.validateSessionWithCapabilities(
+            sessionToken,
+            capabilityCheck
+          );
+
+          // Assert: Capability check should match user's capabilities
+          const hasRequiredCapability = userCapabilities.includes(capabilityCheck.action) ||
+                                       userCapabilities.includes('admin' as any);
+
+          if (hasRequiredCapability) {
+            expect(validation.isValid).toBe(true);
+            expect(validation.session).toBeDefined();
+          } else {
+            expect(validation.isValid).toBe(false);
+            expect(validation.reason).toContain('capabilities');
+          }
+        }
+      ),
+      { numRuns: 50 }
+    );
+  });
+
+  it('Property 7.4: Device fingerprint changes should be tracked and validated', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.emailAddress(),
+        deviceFingerprintArbitrary,
+        deviceFingerprintArbitrary,
+        async (email, originalFingerprint, newFingerprint) => {
+          // Ensure different device IDs
+          fc.pre(originalFingerprint.deviceId !== newFingerprint.deviceId);
+
+          // Arrange: Create user with original device
+          const user = await UserService.createUser({
+            authMethod: { type: 'email', identifier: email },
+            deviceFingerprint: originalFingerprint
+          });
+
+          const originalSession = await sessionManager.createSession(
+            user._id.toString(),
+            user.internalUserId,
+            'email',
+            originalFingerprint,
+            ['read']
+          );
+
+          // Act: Try to create session with new device
+          const newSession = await sessionManager.createSession(
+            user._id.toString(),
+            user.internalUserId,
+            'email',
+            newFingerprint,
+            ['read']
+          );
+
+          // Assert: Both sessions should be valid but tracked separately
+          expect(originalSession.deviceId).toBe(originalFingerprint.deviceId);
+          expect(newSession.deviceId).toBe(newFingerprint.deviceId);
+          expect(originalSession.sessionId).not.toBe(newSession.sessionId);
+
+          // Verify device fingerprints are tracked
+          const updatedUser = await UserService.getUserById(user._id.toString());
+          expect(updatedUser!.deviceFingerprints.length).toBeGreaterThanOrEqual(2);
+          
+          const devices = updatedUser!.deviceFingerprints.map(df => df.deviceId);
+          expect(devices).toContain(originalFingerprint.deviceId);
+          expect(devices).toContain(newFingerprint.deviceId);
+        }
+      ),
+      { numRuns: 25 }
+    );
+  });
+
+  it('Property 7.5: Session validation should work across different authentication methods', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.constantFrom('email', 'phone', 'passkey'),
+        fc.oneof(
+          fc.emailAddress(),
+          fc.string({ minLength: 10, maxLength: 15 }).map(s => '+1' + s),
+          fc.string({ minLength: 32, maxLength: 64 })
+        ),
+        deviceFingerprintArbitrary,
+        capabilitiesArbitrary,
+        async (authType, identifier, deviceFingerprint, capabilities) => {
+          // Arrange: Create user with specified auth method
+          const user = await UserService.createUser({
+            authMethod: { type: authType, identifier },
+            deviceFingerprint
+          });
+
+          // Act: Create and validate session
+          const sessionToken = await sessionManager.createSession(
+            user._id.toString(),
+            user.internalUserId,
+            authType,
+            deviceFingerprint,
+            capabilities
+          );
+
+          const validation = await sessionManager.validateSessionWithCapabilities(sessionToken);
+
+          // Assert: Session should validate regardless of auth method
+          expect(validation.isValid).toBe(true);
+          expect(validation.session!.authMethod).toBe(authType);
+          expect(validation.session!.capabilities).toEqual(capabilities);
+          
+          // Verify session can be found in database
+          const userBySession = await UserService.getUserBySession(sessionToken.sessionId);
+          expect(userBySession).toBeDefined();
+          expect(userBySession!.internalUserId).toBe(user.internalUserId);
+          
+          // Verify no wallet-based validation occurred
+          expect((userBySession as any).walletAddress).toBeUndefined();
+          expect((userBySession as any).connectedWallets).toBeUndefined();
+        }
+      ),
+      { numRuns: 45 }
+    );
+  });
+
+  it('Property 7.6: Session revocation should work immediately for any session', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.emailAddress(),
+        deviceFingerprintArbitrary,
+        fc.string({ minLength: 5, maxLength: 50 }),
+        async (email, deviceFingerprint, reason) => {
+          // Arrange: Create user and session
+          const user = await UserService.createUser({
+            authMethod: { type: 'email', identifier: email },
+            deviceFingerprint
+          });
+
+          const sessionToken = await sessionManager.createSession(
+            user._id.toString(),
+            user.internalUserId,
+            'email',
+            deviceFingerprint,
+            ['read', 'write']
+          );
+
+          // Verify session is initially valid
+          const initialValidation = await sessionManager.validateSessionWithCapabilities(sessionToken);
+          expect(initialValidation.isValid).toBe(true);
+
+          // Act: Revoke session
+          await sessionManager.revokeSession(sessionToken, reason);
+
+          // Assert: Session should be immediately invalid
+          const postRevocationValidation = await sessionManager.validateSessionWithCapabilities(sessionToken);
+          expect(postRevocationValidation.isValid).toBe(false);
+          
+          // Verify session cannot be found
+          const userBySession = await UserService.getUserBySession(sessionToken.sessionId);
+          expect(userBySession).toBeNull();
+        }
+      ),
+      { numRuns: 30 }
+    );
+  });
+});

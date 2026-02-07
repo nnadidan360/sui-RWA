@@ -1,0 +1,247 @@
+/**
+ * Property-Based Test: Account Abstraction Authentication
+ * **Feature: casper-cleanup, Property 3: Account Abstraction Authentication**
+ * 
+ * Tests that user authentication validates through email/phone/passkey methods 
+ * and creates UserAccountObject capabilities without requiring wallet installation.
+ * 
+ * Validates: Requirements 3.1, 3.2, 3.5
+ */
+
+import fc from 'fast-check';
+import { AuthService, AuthCredentials, DeviceFingerprint } from '../../src/services/auth/auth-service';
+import { SessionManager } from '../../src/services/auth/session-manager';
+import { UserService } from '../../src/services/database/user-service';
+import { User } from '../../src/models/User';
+import { connectTestDB, disconnectTestDB } from '../helpers/test-db';
+
+describe('Property 3: Account Abstraction Authentication', () => {
+  let authService: AuthService;
+  let sessionManager: SessionManager;
+
+  beforeAll(async () => {
+    await connectTestDB();
+    authService = new AuthService();
+    sessionManager = new SessionManager(authService);
+  });
+
+  afterAll(async () => {
+    sessionManager.destroy();
+    await disconnectTestDB();
+  });
+
+  beforeEach(async () => {
+    await User.deleteMany({});
+  });
+
+  // Generator for authentication credentials
+  const authCredentialsArbitrary = fc.record({
+    type: fc.constantFrom('email', 'phone', 'passkey'),
+    identifier: fc.oneof(
+      fc.emailAddress(),
+      fc.string({ minLength: 10, maxLength: 15 }).map(s => '+1' + s),
+      fc.string({ minLength: 32, maxLength: 64 })
+    ),
+    otp: fc.string({ minLength: 6, maxLength: 6 }).filter(s => /^\d{6}$/.test(s))
+  });
+
+  // Generator for device fingerprints
+  const deviceFingerprintArbitrary = fc.record({
+    deviceId: fc.uuid(),
+    browserFingerprint: fc.string({ minLength: 32, maxLength: 64 }),
+    ipAddress: fc.ipV4(),
+    userAgent: fc.string({ minLength: 50, maxLength: 200 }),
+    geolocation: fc.record({
+      country: fc.constantFrom('US', 'CA', 'GB', 'DE', 'FR'),
+      region: fc.string({ minLength: 2, maxLength: 20 }),
+      city: fc.string({ minLength: 3, maxLength: 30 })
+    }),
+    screenResolution: fc.constantFrom('1920x1080', '1366x768', '1440x900'),
+    timezone: fc.constantFrom('America/New_York', 'Europe/London', 'Asia/Tokyo')
+  });
+
+  it('Property 3.1: Email authentication should work without wallet installation', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.emailAddress(),
+        deviceFingerprintArbitrary,
+        async (email, deviceFingerprint) => {
+          // Arrange: Create user with email authentication
+          const user = await UserService.createUser({
+            authMethod: { type: 'email', identifier: email },
+            deviceFingerprint
+          });
+
+          // Act: Generate and validate OTP
+          const otpResult = await authService.generateOTP({
+            identifier: email,
+            type: 'email',
+            purpose: 'login'
+          });
+
+          // Assert: OTP should be generated successfully
+          expect(otpResult.success).toBe(true);
+          expect(otpResult.expiresAt).toBeInstanceOf(Date);
+          
+          // Verify no wallet installation was required
+          expect(user.authMethods[0].type).toBe('email');
+          expect(user.authMethods[0].identifier).toBe(email);
+          expect((user as any).walletAddress).toBeUndefined();
+          expect((user as any).connectedWallets).toBeUndefined();
+        }
+      ),
+      { numRuns: 5, timeout: 10000 }
+    );
+  });
+
+  it('Property 3.2: Phone authentication should work without wallet installation', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.string({ minLength: 10, maxLength: 15 }).map(s => '+1' + s),
+        deviceFingerprintArbitrary,
+        async (phone, deviceFingerprint) => {
+          // Arrange: Create user with phone authentication
+          const user = await UserService.createUser({
+            authMethod: { type: 'phone', identifier: phone },
+            deviceFingerprint
+          });
+
+          // Act: Generate and validate OTP
+          const otpResult = await authService.generateOTP({
+            identifier: phone,
+            type: 'phone',
+            purpose: 'login'
+          });
+
+          // Assert: OTP should be generated successfully
+          expect(otpResult.success).toBe(true);
+          expect(otpResult.expiresAt).toBeInstanceOf(Date);
+          
+          // Verify no wallet installation was required
+          expect(user.authMethods[0].type).toBe('phone');
+          expect(user.authMethods[0].identifier).toBe(phone);
+          expect((user as any).walletAddress).toBeUndefined();
+          expect((user as any).connectedWallets).toBeUndefined();
+        }
+      ),
+      { numRuns: 5, timeout: 10000 }
+    );
+  });
+
+  it('Property 3.3: Passkey authentication should work without wallet installation', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.string({ minLength: 32, maxLength: 64 }),
+        deviceFingerprintArbitrary,
+        async (passkeyId, deviceFingerprint) => {
+          // Arrange: Create user with passkey authentication
+          const user = await UserService.createUser({
+            authMethod: { type: 'passkey', identifier: passkeyId },
+            deviceFingerprint
+          });
+
+          // Act: Generate passkey challenge
+          const challenge = await authService.generatePasskeyChallenge(user._id.toString());
+
+          // Assert: Challenge should be generated successfully
+          expect(challenge.challenge).toBeDefined();
+          expect(challenge.timeout).toBeGreaterThan(0);
+          expect(challenge.userVerification).toBeDefined();
+          
+          // Verify no wallet installation was required
+          expect(user.authMethods[0].type).toBe('passkey');
+          expect(user.authMethods[0].identifier).toBe(passkeyId);
+          expect((user as any).walletAddress).toBeUndefined();
+          expect((user as any).connectedWallets).toBeUndefined();
+        }
+      ),
+      { numRuns: 5, timeout: 10000 }
+    );
+  });
+
+  it('Property 3.4: Session creation should work with any authentication method', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        authCredentialsArbitrary,
+        deviceFingerprintArbitrary,
+        fc.array(fc.string({ minLength: 5, maxLength: 20 }), { minLength: 0, maxLength: 5 }),
+        async (credentials, deviceFingerprint, capabilities) => {
+          // Arrange: Create user with the specified auth method
+          const user = await UserService.createUser({
+            authMethod: { type: credentials.type, identifier: credentials.identifier },
+            deviceFingerprint
+          });
+
+          // Act: Create session through session manager
+          const sessionToken = await sessionManager.createSession(
+            user._id.toString(),
+            user.internalUserId,
+            credentials.type,
+            deviceFingerprint,
+            capabilities
+          );
+
+          // Assert: Session should be created successfully
+          expect(sessionToken).toBeDefined();
+          expect(sessionToken.sessionId).toBeDefined();
+          expect(sessionToken.userId).toBe(user._id.toString());
+          expect(sessionToken.internalUserId).toBe(user.internalUserId);
+          expect(sessionToken.authMethod).toBe(credentials.type);
+          expect(sessionToken.capabilities).toEqual(capabilities);
+          expect(sessionToken.isActive).toBe(true);
+          
+          // Verify session validation works
+          const validation = await sessionManager.validateSessionWithCapabilities(sessionToken);
+          expect(validation.isValid).toBe(true);
+          expect(validation.session).toBeDefined();
+        }
+      ),
+      { numRuns: 5, timeout: 10000 }
+    );
+  });
+
+  it('Property 3.5: Multiple authentication methods should work for same user', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.emailAddress(),
+        fc.string({ minLength: 10, maxLength: 15 }).map(s => '+1' + s),
+        deviceFingerprintArbitrary,
+        async (email, phone, deviceFingerprint) => {
+          // Arrange: Create user with email
+          const user = await UserService.createUser({
+            authMethod: { type: 'email', identifier: email },
+            deviceFingerprint
+          });
+
+          // Act: Add phone authentication method
+          const updatedUser = await UserService.addAuthMethod(user._id.toString(), {
+            type: 'phone',
+            identifier: phone
+          });
+
+          // Assert: Both auth methods should work
+          expect(updatedUser).toBeDefined();
+          expect(updatedUser!.authMethods.length).toBe(2);
+          
+          const emailAuth = updatedUser!.authMethods.find(am => am.type === 'email');
+          const phoneAuth = updatedUser!.authMethods.find(am => am.type === 'phone');
+          
+          expect(emailAuth).toBeDefined();
+          expect(emailAuth!.identifier).toBe(email);
+          expect(phoneAuth).toBeDefined();
+          expect(phoneAuth!.identifier).toBe(phone);
+          
+          // Verify user can be found by either method
+          const userByEmail = await UserService.getUserByAuthMethod('email', email);
+          const userByPhone = await UserService.getUserByAuthMethod('phone', phone);
+          
+          expect(userByEmail).toBeDefined();
+          expect(userByPhone).toBeDefined();
+          expect(userByEmail!.internalUserId).toBe(user.internalUserId);
+          expect(userByPhone!.internalUserId).toBe(user.internalUserId);
+        }
+      ),
+      { numRuns: 5, timeout: 10000 }
+    );
+  });
+});

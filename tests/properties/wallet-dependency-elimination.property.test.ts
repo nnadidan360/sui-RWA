@@ -1,0 +1,279 @@
+/**
+ * Property-Based Test: Wallet Dependency Elimination
+ * **Feature: casper-cleanup, Property 1: Wallet Dependency Elimination**
+ * 
+ * Tests that the system functions without wallet addresses, wallet signatures, 
+ * or wallet-based authentication, using only internal user IDs and session tokens.
+ * 
+ * Validates: Requirements 1.1, 1.2, 1.3, 1.4
+ */
+
+import fc from 'fast-check';
+import { UserService } from '../../src/services/database/user-service';
+import { AuthService } from '../../src/services/auth/auth-service';
+import { User } from '../../src/models/User';
+import { connectTestDB, disconnectTestDB } from '../helpers/test-db';
+
+describe('Property 1: Wallet Dependency Elimination', () => {
+  beforeAll(async () => {
+    await connectTestDB();
+  });
+
+  afterAll(async () => {
+    await disconnectTestDB();
+  });
+
+  beforeEach(async () => {
+    await User.deleteMany({});
+  });
+
+  // Generator for authentication methods
+  const authMethodArbitrary = fc.record({
+    type: fc.constantFrom('email', 'phone', 'passkey'),
+    identifier: fc.oneof(
+      fc.emailAddress(), // for email
+      fc.string({ minLength: 10, maxLength: 15 }).map(s => '+1' + s), // for phone
+      fc.string({ minLength: 32, maxLength: 64 }) // for passkey
+    )
+  });
+
+  // Generator for device fingerprints
+  const deviceFingerprintArbitrary = fc.record({
+    deviceId: fc.uuid(),
+    browserFingerprint: fc.string({ minLength: 32, maxLength: 64 }),
+    ipAddress: fc.ipV4(),
+    userAgent: fc.string({ minLength: 50, maxLength: 200 }),
+    geolocation: fc.record({
+      country: fc.constantFrom('US', 'CA', 'GB', 'DE', 'FR'),
+      region: fc.string({ minLength: 2, maxLength: 20 }),
+      city: fc.string({ minLength: 3, maxLength: 30 })
+    }),
+    screenResolution: fc.constantFrom('1920x1080', '1366x768', '1440x900'),
+    timezone: fc.constantFrom('America/New_York', 'Europe/London', 'Asia/Tokyo')
+  });
+
+  // Generator for user creation requests
+  const createUserRequestArbitrary = fc.record({
+    authMethod: authMethodArbitrary,
+    deviceFingerprint: deviceFingerprintArbitrary,
+    profile: fc.record({
+      firstName: fc.string({ minLength: 2, maxLength: 30 }),
+      lastName: fc.string({ minLength: 2, maxLength: 30 }),
+      country: fc.constantFrom('US', 'CA', 'GB', 'DE', 'FR')
+    })
+  });
+
+  it('Property 1.1: User creation should never require wallet addresses', async () => {
+    await fc.assert(
+      fc.asyncProperty(createUserRequestArbitrary, async (userRequest) => {
+        // Act: Create user without any wallet information
+        const user = await UserService.createUser(userRequest);
+
+        // Assert: User should be created successfully without wallet fields
+        expect(user).toBeDefined();
+        expect(user.internalUserId).toBeDefined();
+        expect(user.internalUserId).toMatch(/^[0-9a-f-]{36}$/); // UUID format
+        
+        // Verify no wallet-related fields exist
+        expect((user as any).walletAddress).toBeUndefined();
+        expect((user as any).connectedWallets).toBeUndefined();
+        
+        // Verify account abstraction fields exist
+        expect(user.authMethods).toBeDefined();
+        expect(user.authMethods.length).toBeGreaterThan(0);
+        expect(user.deviceFingerprints).toBeDefined();
+        expect(user.activeSessions).toBeDefined();
+        
+        // Verify auth method matches request
+        const authMethod = user.authMethods[0];
+        expect(authMethod.type).toBe(userRequest.authMethod.type);
+        expect(authMethod.identifier).toBe(userRequest.authMethod.identifier);
+      }),
+      { numRuns: 5, timeout: 10000 }
+    );
+  });
+
+  it('Property 1.2: User lookup should work with internal IDs only', async () => {
+    await fc.assert(
+      fc.asyncProperty(createUserRequestArbitrary, async (userRequest) => {
+        // Arrange: Create a user
+        const createdUser = await UserService.createUser(userRequest);
+        
+        // Act: Look up user by internal ID
+        const foundUser = await UserService.getUserByInternalId(createdUser.internalUserId);
+        
+        // Assert: User should be found using internal ID
+        expect(foundUser).toBeDefined();
+        expect(foundUser!.internalUserId).toBe(createdUser.internalUserId);
+        expect(foundUser!._id.toString()).toBe(createdUser._id.toString());
+        
+        // Verify no wallet-based lookup is needed
+        expect(foundUser!.authMethods).toBeDefined();
+        expect(foundUser!.authMethods.length).toBeGreaterThan(0);
+      }),
+      { numRuns: 5, timeout: 10000 }
+    );
+  });
+
+  it('Property 1.3: Authentication should work through auth methods only', async () => {
+    await fc.assert(
+      fc.asyncProperty(createUserRequestArbitrary, async (userRequest) => {
+        // Arrange: Create a user
+        const createdUser = await UserService.createUser(userRequest);
+        
+        // Act: Look up user by auth method
+        const foundUser = await UserService.getUserByAuthMethod(
+          userRequest.authMethod.type,
+          userRequest.authMethod.identifier
+        );
+        
+        // Assert: User should be found using auth method
+        expect(foundUser).toBeDefined();
+        expect(foundUser!.internalUserId).toBe(createdUser.internalUserId);
+        
+        // Verify auth method is properly stored
+        const authMethod = foundUser!.authMethods.find(
+          am => am.type === userRequest.authMethod.type && 
+                am.identifier === userRequest.authMethod.identifier
+        );
+        expect(authMethod).toBeDefined();
+        expect(authMethod!.isActive).toBe(true);
+      }),
+      { numRuns: 5, timeout: 10000 }
+    );
+  });
+
+  it('Property 1.4: Session management should work without wallet signatures', async () => {
+    const authService = new AuthService();
+    
+    await fc.assert(
+      fc.asyncProperty(
+        createUserRequestArbitrary,
+        fc.string({ minLength: 10, maxLength: 50 }),
+        async (userRequest, sessionData) => {
+          // Arrange: Create a user
+          const createdUser = await UserService.createUser(userRequest);
+          
+          // Act: Create session without wallet signature
+          const sessionResult = await UserService.createSession(
+            createdUser._id.toString(),
+            userRequest.deviceFingerprint,
+            24 // 24 hours
+          );
+          
+          // Assert: Session should be created successfully
+          expect(sessionResult).toBeDefined();
+          expect(sessionResult!.sessionId).toBeDefined();
+          expect(sessionResult!.user.internalUserId).toBe(createdUser.internalUserId);
+          
+          // Verify session can be validated
+          const foundUser = await UserService.getUserBySession(sessionResult!.sessionId);
+          expect(foundUser).toBeDefined();
+          expect(foundUser!.internalUserId).toBe(createdUser.internalUserId);
+          
+          // Verify no wallet-based validation is needed
+          expect(foundUser!.activeSessions.length).toBeGreaterThan(0);
+          const activeSession = foundUser!.activeSessions.find(s => s.sessionId === sessionResult!.sessionId);
+          expect(activeSession).toBeDefined();
+          expect(activeSession!.isActive).toBe(true);
+        }
+      ),
+      { numRuns: 5, timeout: 10000 }
+    );
+  });
+
+  it('Property 1.5: Search functionality should exclude wallet addresses', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.array(createUserRequestArbitrary, { minLength: 2, maxLength: 5 }),
+        async (userRequests) => {
+          // Arrange: Create multiple users
+          const createdUsers = [];
+          for (const request of userRequests) {
+            const user = await UserService.createUser(request);
+            createdUsers.push(user);
+          }
+          
+          // Act: Search for users using various criteria
+          const searchQueries = [
+            createdUsers[0].internalUserId.substring(0, 8), // partial internal ID
+            createdUsers[0].authMethods[0].identifier, // auth method identifier
+            createdUsers[0].profile?.firstName || 'test' // profile data
+          ];
+          
+          for (const query of searchQueries) {
+            const searchResults = await UserService.searchUsers(query, { page: 1, limit: 10 });
+            
+            // Assert: Search should work without wallet addresses
+            expect(searchResults).toBeDefined();
+            expect(searchResults.users).toBeDefined();
+            
+            // Verify no wallet fields in search results
+            for (const user of searchResults.users) {
+              expect((user as any).walletAddress).toBeUndefined();
+              expect((user as any).connectedWallets).toBeUndefined();
+              expect(user.internalUserId).toBeDefined();
+              expect(user.authMethods).toBeDefined();
+            }
+          }
+        }
+      ),
+      { numRuns: 5, timeout: 10000 }
+    );
+  });
+
+  it('Property 1.6: All user operations should function without wallet dependencies', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        createUserRequestArbitrary,
+        fc.record({
+          firstName: fc.string({ minLength: 2, maxLength: 30 }),
+          lastName: fc.string({ minLength: 2, maxLength: 30 })
+        }),
+        async (userRequest, profileUpdate) => {
+          // Arrange: Create a user
+          const createdUser = await UserService.createUser(userRequest);
+          
+          // Act: Perform various user operations
+          
+          // 1. Update user profile
+          const updatedUser = await UserService.updateUser(createdUser._id.toString(), {
+            profile: profileUpdate
+          });
+          
+          // 2. Add additional auth method
+          const newAuthMethod = {
+            type: 'email' as const,
+            identifier: `test-${Date.now()}@example.com`
+          };
+          const userWithNewAuth = await UserService.addAuthMethod(
+            createdUser._id.toString(),
+            newAuthMethod
+          );
+          
+          // 3. Log activity
+          await UserService.logActivity(
+            createdUser._id.toString(),
+            'test_action',
+            { test: 'data' }
+          );
+          
+          // Assert: All operations should succeed without wallet dependencies
+          expect(updatedUser).toBeDefined();
+          expect(updatedUser!.profile.firstName).toBe(profileUpdate.firstName);
+          expect(updatedUser!.profile.lastName).toBe(profileUpdate.lastName);
+          
+          expect(userWithNewAuth).toBeDefined();
+          expect(userWithNewAuth!.authMethods.length).toBe(2);
+          
+          // Verify no wallet fields are present in any operation
+          expect((updatedUser as any).walletAddress).toBeUndefined();
+          expect((userWithNewAuth as any).walletAddress).toBeUndefined();
+          expect((updatedUser as any).connectedWallets).toBeUndefined();
+          expect((userWithNewAuth as any).connectedWallets).toBeUndefined();
+        }
+      ),
+      { numRuns: 5, timeout: 10000 }
+    );
+  });
+});
