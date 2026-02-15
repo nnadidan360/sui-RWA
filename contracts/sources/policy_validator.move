@@ -505,6 +505,104 @@ module credit_os::policy_validator {
         validator.version = validator.version + 1;
     }
 
+    /// Update policy validator with new rules (versioned update)
+    public fun update_policy_validator(
+        validator: &mut PolicyValidator,
+        new_rules: vector<ValidationRule>,
+        new_requirements: vector<CapabilityRequirement>,
+        clock: &Clock,
+        _ctx: &mut TxContext
+    ) {
+        validator.validation_rules = new_rules;
+        validator.capability_requirements = new_requirements;
+        validator.updated_at = clock::timestamp_ms(clock);
+        validator.version = validator.version + 1;
+    }
+
+    /// Remove a validation rule by index
+    public fun remove_validation_rule(
+        validator: &mut PolicyValidator,
+        rule_index: u64,
+        clock: &Clock,
+        _ctx: &mut TxContext
+    ) {
+        assert!(rule_index < vector::length(&validator.validation_rules), EInvalidValidationRule);
+        vector::remove(&mut validator.validation_rules, rule_index);
+        validator.updated_at = clock::timestamp_ms(clock);
+        validator.version = validator.version + 1;
+    }
+
+    /// Remove a capability requirement by index
+    public fun remove_capability_requirement(
+        validator: &mut PolicyValidator,
+        requirement_index: u64,
+        clock: &Clock,
+        _ctx: &mut TxContext
+    ) {
+        assert!(requirement_index < vector::length(&validator.capability_requirements), EInvalidValidationRule);
+        vector::remove(&mut validator.capability_requirements, requirement_index);
+        validator.updated_at = clock::timestamp_ms(clock);
+        validator.version = validator.version + 1;
+    }
+
+    /// Update policy mapping in registry
+    public fun update_policy_mapping(
+        registry: &mut PolicyRegistry,
+        action_type: String,
+        new_validator_id: address,
+        clock: &Clock,
+        _ctx: &mut TxContext
+    ) {
+        let mappings = &mut registry.policy_mappings;
+        let len = vector::length(mappings);
+        let mut i = 0;
+        let mut found = false;
+
+        while (i < len) {
+            let mapping = vector::borrow_mut(mappings, i);
+            if (mapping.action_type == action_type) {
+                mapping.policy_validator_id = new_validator_id;
+                found = true;
+                break
+            };
+            i = i + 1;
+        };
+
+        if (!found) {
+            let new_mapping = PolicyMapping {
+                action_type,
+                policy_validator_id: new_validator_id,
+                is_active: true,
+            };
+            vector::push_back(mappings, new_mapping);
+        };
+
+        registry.updated_at = clock::timestamp_ms(clock);
+    }
+
+    /// Deactivate a policy mapping
+    public fun deactivate_policy_mapping(
+        registry: &mut PolicyRegistry,
+        action_type: String,
+        clock: &Clock,
+        _ctx: &mut TxContext
+    ) {
+        let mappings = &mut registry.policy_mappings;
+        let len = vector::length(mappings);
+        let mut i = 0;
+
+        while (i < len) {
+            let mapping = vector::borrow_mut(mappings, i);
+            if (mapping.action_type == action_type) {
+                mapping.is_active = false;
+                break
+            };
+            i = i + 1;
+        };
+
+        registry.updated_at = clock::timestamp_ms(clock);
+    }
+
     // === Getter functions ===
 
     /// Get policy type
