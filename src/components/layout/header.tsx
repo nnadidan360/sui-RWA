@@ -75,9 +75,6 @@ export function Header({ onMenuClick }: HeaderProps) {
             
             {/* Language Switcher */}
             <LanguageSwitcher />
-
-            {/* Wallet Connection */}
-            <WalletConnection compact={true} showBalance={false} />
           </div>
         </div>
       </div> 

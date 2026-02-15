@@ -4,3 +4,6 @@ export { BorrowPositions } from './borrow-positions';
 export { LendingPositions } from './lending-positions';
 export { BorrowModal } from './borrow-modal';
 export { SupplyModal } from './supply-modal';
+export { LoanDashboard } from './loan-dashboard';
+export { RepaymentInterface } from './repayment-interface';
+export { CreditCapabilityVisualization } from './credit-capability-visualization';
