@@ -11,14 +11,18 @@ export const connectDatabase = async (): Promise<void> => {
 
     const options = {
       maxPoolSize: 10,
-      serverSelectionTimeoutMS: 5000,
+      serverSelectionTimeoutMS: 30000, // Increased to 30 seconds
       socketTimeoutMS: 45000,
+      connectTimeoutMS: 30000, // Added connection timeout
       bufferCommands: false,
+      retryWrites: true,
+      retryReads: true,
     };
 
+    logger.info('Connecting to MongoDB...');
     await mongoose.connect(mongoUri, options);
     
-    logger.info('✅ Connected to MongoDB');
+    logger.info('✅ Connected to MongoDB successfully');
     
     // Handle connection events
     mongoose.connection.on('error', (error) => {
@@ -33,8 +37,22 @@ export const connectDatabase = async (): Promise<void> => {
       logger.info('MongoDB reconnected');
     });
     
-  } catch (error) {
-    logger.error('Failed to connect to MongoDB:', error);
+  } catch (error: any) {
+    logger.error('Failed to connect to MongoDB:', {
+      error: error.message,
+      code: error.code,
+      name: error.name
+    });
+    
+    // Provide helpful error messages
+    if (error.message?.includes('IP') || error.message?.includes('whitelist')) {
+      logger.error('💡 Tip: Check your MongoDB Atlas Network Access settings');
+      logger.error('   1. Go to https://cloud.mongodb.com');
+      logger.error('   2. Select your cluster');
+      logger.error('   3. Click "Network Access"');
+      logger.error('   4. Add your current IP or allow 0.0.0.0/0 for testing');
+    }
+    
     throw error;
   }
 };

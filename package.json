@@ -18,7 +18,7 @@
     "db:seed": "node scripts/seed-database.js",
     "db:migrate": "node scripts/migrate-database.js",
     "db:backup": "node scripts/backup-database.js",
-    "contracts:build": "cd ../contracts && cargo build --release",
+    "contracts:build": "cd contracts && cargo build --release",
     "contracts:deploy": "node scripts/deploy-contracts.js",
     "contracts:test": "cd ../contracts && cargo test"
   },

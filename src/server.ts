@@ -21,6 +21,10 @@ import authRoutes from './controllers/auth';
 import userRoutes from './controllers/users';
 import assetRoutes from './routes/assets';
 import cryptoRoutes from './routes/crypto';
+import loanRoutes from './routes/loans';
+import creditRoutes from './routes/credit';
+import vaultRoutes from './routes/vaults';
+import transactionRoutes from './routes/transactions';
 import blockchainRoutes from './controllers/blockchain';
 import ipfsRoutes from './controllers/ipfs';
 import notificationRoutes from './controllers/notifications';
@@ -100,12 +104,14 @@ app.use('/api', authMiddleware);
 app.use('/api/users', userRoutes);
 app.use('/api/assets', assetRoutes);
 app.use('/api/crypto', cryptoRoutes);
+app.use('/api/loans', loanRoutes);
+app.use('/api/credit', creditRoutes);
+app.use('/api/vaults', vaultRoutes);
+app.use('/api/transactions', transactionRoutes);
 app.use('/api/blockchain', blockchainRoutes);
 app.use('/api/ipfs', ipfsRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/realtime', realtimeRoutes);
-// app.use('/api/loans', loanRoutes);
-// app.use('/api/transactions', transactionRoutes);
 
 // Error handling middleware (must be last)
 app.use(notFoundHandler);

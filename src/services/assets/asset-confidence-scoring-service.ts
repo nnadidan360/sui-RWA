@@ -39,7 +39,7 @@ export interface AssetVerificationData {
   documentAgeInDays: number;
 }
 
-export class AssetConfidenceScoring Service {
+export class AssetConfidenceScoringService {
   // Scoring weights
   private readonly WEIGHTS = {
     documentQuality: 0.20,

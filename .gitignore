@@ -5,7 +5,10 @@ npm-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
-
+API_DOCUMENTATION.md
+QUICKSTART.md
+TESTING_GUIDE.md
+postman-collection.json
 # Next.js
 .next/
 out/

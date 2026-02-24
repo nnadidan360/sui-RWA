@@ -70,7 +70,7 @@ export interface ITransaction extends Document {
 
 const TransactionSchema = new Schema<ITransaction>({
   transactionId: { type: String, required: true, unique: true, index: true },
-  deployHash: { type: String, unique: true, sparse: true, index: true },
+  txHash: { type: String, unique: true, sparse: true, index: true },
   blockHash: { type: String, index: true },
   blockNumber: { type: Number, index: true },
   

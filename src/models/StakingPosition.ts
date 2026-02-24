@@ -10,6 +10,9 @@ export interface IStakingPosition extends Document {
   // Account abstraction integration
   userAccountObjectId: string;
   sessionId?: string;
+  
+  // Validator delegation
+  delegation: {
     delegatedValidators: Array<{
       validatorAddress: string;
       delegatedAmount: number;
@@ -83,6 +86,8 @@ const StakingPositionSchema = new Schema<IStakingPosition>({
   
   userAccountObjectId: { type: String, required: true },
   sessionId: { type: String, sparse: true },
+  
+  delegation: {
     delegatedValidators: [{
       validatorAddress: { type: String, required: true },
       delegatedAmount: { type: Number, required: true },
