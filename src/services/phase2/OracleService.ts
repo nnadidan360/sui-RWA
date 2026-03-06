@@ -3,7 +3,6 @@
 // Multi-source oracle aggregation and validation
 
 import { logger } from '../../utils/logger';
-import axios from 'axios';
 
 interface PropertyValuation {
   address: string;

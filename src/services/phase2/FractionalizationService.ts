@@ -65,7 +65,7 @@ export class FractionalizationService {
     }
 
     // Check asset verification status
-    if (asset.verificationStatus !== 'verified') {
+    if (asset.verification.status !== 'approved') {
       return {
         canFractionalize: false,
         reason: 'Asset must be verified before fractionalization'
@@ -115,9 +115,9 @@ export class FractionalizationService {
     // Create fractional token
     const fractionalToken = new FractionalToken({
       originalAssetId: assetId,
-      assetName: assetName || asset.name,
-      assetDescription: assetDescription || asset.description,
-      assetType: this.mapAssetType(asset.type),
+      assetName: assetName || asset.metadata.title,
+      assetDescription: assetDescription || asset.metadata.description,
+      assetType: this.mapAssetType(asset.assetType),
       totalSupply: supply,
       circulatingSupply: supply,
       pricePerToken: price,

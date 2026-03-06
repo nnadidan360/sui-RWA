@@ -182,7 +182,7 @@ FractionalTokenSchema.virtual('marketCap').get(function() {
 
 // Method to get holder by userId
 FractionalTokenSchema.methods.getHolder = function(userId: string) {
-  return this.holders.find(h => h.userId.toString() === userId);
+  return this.holders.find((h: any) => h.userId.toString() === userId);
 };
 
 // Method to update holder balance
@@ -190,7 +190,7 @@ FractionalTokenSchema.methods.updateHolderBalance = function(
   userId: string,
   newBalance: number
 ) {
-  const holder = this.holders.find(h => h.userId.toString() === userId);
+  const holder = this.holders.find((h: any) => h.userId.toString() === userId);
   if (holder) {
     holder.balance = newBalance;
     holder.percentage = (newBalance / this.totalSupply) * 100;

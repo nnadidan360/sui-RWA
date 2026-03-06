@@ -30,6 +30,9 @@ import ipfsRoutes from './controllers/ipfs';
 import notificationRoutes from './controllers/notifications';
 import realtimeRoutes from './routes/realtime';
 
+// Phase 3 routes
+import invoiceRoutes from './routes/phase3/invoices';
+
 // Load environment variables
 dotenv.config();
 
@@ -112,6 +115,9 @@ app.use('/api/blockchain', blockchainRoutes);
 app.use('/api/ipfs', ipfsRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/realtime', realtimeRoutes);
+
+// Phase 3 routes
+app.use('/api/phase3/invoices', invoiceRoutes);
 
 // Error handling middleware (must be last)
 app.use(notFoundHandler);

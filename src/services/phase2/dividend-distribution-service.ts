@@ -2,9 +2,9 @@
 // Task 16.3 - Dividend Distribution System
 // Automated income collection and distribution for fractional token holders
 
-import { TransactionBlock } from '@mysten/sui.js/transactions';
-import { SuiClient } from '@mysten/sui.js/client';
-import logger from '../../utils/logger';
+import { Transaction } from '@mysten/sui/transactions';
+import { SuiClient } from '@mysten/sui/client';
+import { logger } from '../../utils/logger';
 
 interface DividendPoolInfo {
   poolId: string;
@@ -63,7 +63,7 @@ export class DividendDistributionService {
     signerAddress: string
   ): Promise<string> {
     try {
-      const tx = new TransactionBlock();
+      const tx = new Transaction();
 
       tx.moveCall({
         target: `${this.packageId}::dividend_pool::create_pool`,
@@ -91,7 +91,7 @@ export class DividendDistributionService {
     signerAddress: string
   ): Promise<void> {
     try {
-      const tx = new TransactionBlock();
+      const tx = new Transaction();
 
       // Split coin for payment
       const [coin] = tx.splitCoins(tx.gas, [tx.pure(amount)]);
@@ -120,7 +120,7 @@ export class DividendDistributionService {
     signerAddress: string
   ): Promise<DividendDistribution> {
     try {
-      const tx = new TransactionBlock();
+      const tx = new Transaction();
 
       tx.moveCall({
         target: `${this.packageId}::dividend_pool::create_distribution`,
@@ -177,7 +177,7 @@ export class DividendDistributionService {
     signerAddress: string
   ): Promise<string> {
     try {
-      const tx = new TransactionBlock();
+      const tx = new Transaction();
 
       tx.moveCall({
         target: `${this.packageId}::dividend_pool::create_claim`,
@@ -208,7 +208,7 @@ export class DividendDistributionService {
     signerAddress: string
   ): Promise<void> {
     try {
-      const tx = new TransactionBlock();
+      const tx = new Transaction();
 
       tx.moveCall({
         target: `${this.packageId}::dividend_pool::claim_dividend`,
